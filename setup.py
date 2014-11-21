@@ -13,6 +13,7 @@ setup(name='calysto',
       author='Douglas Blank',
       author_email='doug.blank@gmail.com',
       url="https://github.com/Calysto/calysto",
+      install_requires=['IPython', 'metakernel', 'svgwrite', 'Pillow']
       packages=['calysto'],
       classifiers = [
           'Framework :: IPython',
