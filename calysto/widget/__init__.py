@@ -4,7 +4,7 @@ from IPython.core import display
 from PIL import Image
 
 from .camera import Camera
-from .googlechart import GoogleChart
+from calysto.chart import GoogleChart
 
 __all__ = ['Camera', 'GoogleChart']
 
