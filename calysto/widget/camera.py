@@ -10,10 +10,13 @@ except:
 
 import base64
 from PIL import Image
-import StringIO
 from numpy import array, ndarray
-
 import time
+
+try:
+    import StringIO
+except ImportError:
+    from io import StringIO
 
 class Camera(DOMWidget):
     _view_name = Unicode('CameraView', sync=True)
@@ -102,5 +105,5 @@ class Camera(DOMWidget):
 		
 		});"""
 
-	def click(self):
-	    display(Javascript("document.getElementById('picture_button').click();"))
+    def click(self):
+        display(Javascript("document.getElementById('picture_button').click();"))
