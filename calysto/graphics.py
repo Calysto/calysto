@@ -151,8 +151,8 @@ class Circle(Shape):
         self.center = center
         return self.canvas
 
-    def move(self, (delta_x, delta_y)):
-        self.center = self.center[0] + delta_x, self.center[1] + delta_y
+    def move(self, delta):
+        self.center = self.center[0] + delta[0], self.center[1] + delta[1]
         return self.canvas
 
     def _add(self, drawing):
@@ -176,9 +176,9 @@ class Line(Shape):
         self.end = self.end[0] + diff_x, self.end[1] + diff_y
         return self.canvas
 
-    def move(self, (delta_x, delta_y)):
-        self.start = self.start[0] + delta_x, self.start[1] + delta_y
-        self.end = self.end[0] + delta_x, self.end[1] + delta_y
+    def move(self, delta):
+        self.start = self.start[0] + delta[0], self.start[1] + delta[1]
+        self.end = self.end[0] + delta[0], self.end[1] + delta[1]
         return self.canvas
 
     def _add(self, drawing):
@@ -195,8 +195,8 @@ class Text(Shape):
         self.start = start
         return self.canvas
 
-    def move(self, (delta_x, delta_y)):
-        self.start = self.start[0] + delta_x, self.start[1] + delta_y
+    def move(self, delta):
+        self.start = self.start[0] + delta[0], self.start[1] + delta[1]
         return self.canvas
 
     def _add(self, drawing):
@@ -221,8 +221,8 @@ class Rectangle(Shape):
         self.start = start
         return self.canvas
 
-    def move(self, (delta_x, delta_y)):
-        self.start = self.start[0] + delta_x, self.start[1] + delta_y
+    def move(self, delta):
+        self.start = self.start[0] + delta[0], self.start[1] + delta[1]
         return self.canvas
 
     def _add(self, drawing):
@@ -245,8 +245,8 @@ class Ellipse(Shape):
         self.center = center
         return self.canvas
 
-    def move(self, (delta_x, delta_y)):
-        self.center = self.center[0] + delta_x, self.center[1] + delta_y
+    def move(self, delta):
+        self.center = self.center[0] + delta[0], self.center[1] + delta[1]
         return self.canvas
 
     def _add(self, drawing):
@@ -265,9 +265,9 @@ class Polyline(Shape):
             self.points[i] = self.points[i][0] + diff_x, self.points[i][1] + diff_y
         return self.canvas
 
-    def move(self, (delta_x, delta_y)):
+    def move(self, delta):
         for i in range(len(self.points)):
-            self.points[i] = self.points[i][0] + delta_x, self.points[i][1] + delta_y
+            self.points[i] = self.points[i][0] + delta[0], self.points[i][1] + delta[1]
         return self.canvas
 
     def _add(self, drawing):
@@ -292,9 +292,9 @@ class Polygon(Shape):
             self.points[i] = self.points[i][0] + diff_x, self.points[i][1] + diff_y
         return self.canvas
 
-    def move(self, (delta_x, delta_y)):
+    def move(self, delta):
         for i in range(len(self.points)):
-            self.points[i] = self.points[i][0] + delta_x, self.points[i][1] + delta_y
+            self.points[i] = self.points[i][0] + delta[0], self.points[i][1] + delta[1]
         return self.canvas
 
     def _add(self, drawing):
@@ -312,8 +312,8 @@ class Picture(Shape):
         self.start = start
         return self.canvas
 
-    def move(self, (delta_x, delta_y)):
-        self.start = self.start[0] + delta_x, self.start[1] + delta_y
+    def move(self, delta):
+        self.start = self.start[0] + delta[0], self.start[1] + delta[1]
         return self.canvas
 
     def _add(self, drawing):
