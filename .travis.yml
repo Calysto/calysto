@@ -33,10 +33,10 @@ install:
     - travis_retry python setup.py install
 
 script:
-    -  nosetests --exe -v --with-doctest metakernel
+    -  nosetests --exe -v --with-doctest calysto
 
 script:
-  - nosetests --exe -v --with-doctest --with-cov --cover-package metakernel;
+  - nosetests --exe -v --with-doctest --with-cov --cover-package calysto;
 
 after_success:
     - coveralls
