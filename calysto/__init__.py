@@ -1,4 +1,3 @@
 
-__all__ = ['scheme', 'widget', 'display', 'kernel', 
-           'language', 'util', 'chart']
+__all__ = ['widget', 'display', 'language', 'util', 'chart']
 
