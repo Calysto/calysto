@@ -102,6 +102,10 @@ class Symbol(object):
         # So that EmptyList will be treated as []
         raise StopIteration
 
+    def __next__(self):
+        # So that EmptyList will be treated as []
+        raise StopIteration
+
     def __len__(self):
         # So that EmptyList will be treated as []
         return 0
@@ -178,7 +182,15 @@ class cons(object):
         else:
             return 1
 
-    def next(self): # Python 3: def __next__(self)
+    def next(self): # Python 2
+        if not isinstance(self.current, cons):
+            raise StopIteration
+        else:
+            retval = self.current.car
+            self.current = self.current.cdr
+            return retval
+
+    def __next__(self): # Python 3
         if not isinstance(self.current, cons):
             raise StopIteration
         else:
