@@ -1,11 +1,21 @@
 
-
 class GoogleChart(object):
+    USE_PNG = False
+    SET_VAR = False
+
     id = 0
     def __init__(self, gtype, keys=[], data=[], **options):
         self.gtype = gtype
         self.keys = keys
         self.data = data
+        self.use_png = GoogleChart.USE_PNG
+        self.set_var = GoogleChart.SET_VAR
+        if "use_png" in options:
+            self.use_png = options["use_png"]
+            del options["use_png"]
+        if "set_var" in options:
+            self.set_var = options["set_var"]
+            del options["set_var"]
         self.options = options
         GoogleChart.id += 1
         
@@ -50,8 +60,23 @@ class GoogleChart(object):
 
             var data = google.visualization.arrayToDataTable(%(data)s);
             var options = %(options)s;
+            if (%(use_png)s || %(set_var)s) {
+               // Wait for the chart to finish drawing before calling the getImageURI() method.
+               google.visualization.events.addListener(chart, 'ready', function () {
+               if (%(use_png)s) {
+                  chart_div_%(id)s.innerHTML = '<img src="' + chart.getImageURI() + '">';
+               }
+               if (%(set_var)s) {
+                  IPython.notebook.kernel.execute.('%set chart_div_%(id)s', chart.getImageURI());
+               });
+            }
             chart.draw(data, options);
         };
         google.load('visualization', '1.0', {'callback': drawChart, 'packages':['corechart']});
         });
-</script>""" % {"gtype": self.gtype, "data": self._arrayToDataTable(), "options": self.options, "id": self.id}
+</script>""" % {"gtype": self.gtype, 
+                "data": self._arrayToDataTable(), 
+                "options": self.options, 
+                "use_png": "true" if self.use_png else "false",
+                "set_var": "true" if self.set_var else "false",
+                "id": self.id}
