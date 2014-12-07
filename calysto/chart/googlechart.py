@@ -67,7 +67,7 @@ class GoogleChart(object):
                   chart_div_%(id)s.innerHTML = '<img src="' + chart.getImageURI() + '">';
                }
                if (%(set_var)s) {
-                  IPython.notebook.kernel.execute.('%set chart_div_%(id)s', chart.getImageURI());
+                  IPython.notebook.kernel.execute.('%%set chart_div_%(id)s', chart.getImageURI());
                });
             }
             chart.draw(data, options);
