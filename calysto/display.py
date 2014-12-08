@@ -2,7 +2,8 @@
 __all__ = ["display"]
 
 try:
-    import jupyter_kernel
-    display = jupyter_kernel.get_jupyter().Display
+    # use a metakernel Display:
+    display = kernel.Display
 except:
+    # use the standard IPython display:
     from IPython.display import display

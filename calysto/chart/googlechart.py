@@ -1,3 +1,7 @@
+from __future__ import print_function
+
+from IPython.display import Javascript, HTML
+from calysto.display import display
 
 class GoogleChart(object):
     USE_PNG = False
@@ -49,6 +53,25 @@ class GoogleChart(object):
             t += 1
         return table
         
+    def set_png_variable(self, variable=None):
+        if variable is None:
+            variable = self.get_chart_name()
+        display(Javascript("IPython.notebook.kernel.execute('%%set %(variable)s \"' + document.charts['chart_div_%(id)s'].getImageURI() + '\"');" 
+                           % {"id": self.id,
+                              "variable": variable}))
+        print("Set '%s' to png" % variable)
+
+    def show_png(self):
+        display(HTML("""
+        <img src="" id="image_chart_div_%(id)s"/>
+        <script>
+           document.getElementById("image_chart_div_%(id)s").src = document.charts['chart_div_%(id)s'].getImageURI();
+        </script>
+        """ % {"id": self.id}))
+
+    def get_chart_name(self):
+        return "chart_div_%(id)s" % {"id": self.id}
+
     def _repr_html_(self):
         return """
 <div id="chart_div_%(id)s" style="height: 400px;"></div>
@@ -63,14 +86,19 @@ class GoogleChart(object):
             if (%(use_png)s || %(set_var)s) {
                // Wait for the chart to finish drawing before calling the getImageURI() method.
                google.visualization.events.addListener(chart, 'ready', function () {
-               if (%(use_png)s) {
-                  chart_div_%(id)s.innerHTML = '<img src="' + chart.getImageURI() + '">';
-               }
-               if (%(set_var)s) {
-                  IPython.notebook.kernel.execute.('%%set chart_div_%(id)s', chart.getImageURI());
+                  if (%(use_png)s) {
+                     chart_div_%(id)s.innerHTML = '<img src="' + chart.getImageURI() + '">';
+                  }
+                  if (%(set_var)s) {
+                     IPython.notebook.kernel.execute('%%set chart_div_%(id)s "' + chart.getImageURI() + '"');
+                  }
                });
             }
             chart.draw(data, options);
+            if (document.charts === undefined) {
+               document.charts = {};
+            }
+            document.charts['chart_div_%(id)s'] = chart;
         };
         google.load('visualization', '1.0', {'callback': drawChart, 'packages':['corechart']});
         });
