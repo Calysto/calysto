@@ -17,9 +17,12 @@ import sys
 PY3 = (sys.version_info[0] >= 3)
 
 def read_secret_key():
-    filename = os.path.expanduser("~/.ipython/profile_calico/security/notebook_secret")
-    with open(filename, 'rb') as f:
-        return f.read()
+    try:
+        filename = os.path.expanduser("~/.ipython/profile_calico/security/notebook_secret")
+        with open(filename, 'rb') as f:
+            return f.read()
+    except:
+        return "NOSECRET-FIXME"
 
 encoder = json.encoder.JSONEncoder(sort_keys=True, indent=1)
 key = read_secret_key()
