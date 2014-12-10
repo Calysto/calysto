@@ -1,4 +1,4 @@
 
-from .scheme import scheme
+from . import scheme
 
 __all__ = ["scheme"]

@@ -12,6 +12,9 @@ import json
 import uuid
 import hmac
 import hashlib
+import sys
+
+PY3 = (sys.version_info[0] >= 3)
 
 def read_secret_key():
     filename = os.path.expanduser("~/.ipython/profile_calico/security/notebook_secret")
@@ -19,9 +22,13 @@ def read_secret_key():
         return f.read()
 
 encoder = json.encoder.JSONEncoder(sort_keys=True, indent=1)
-unicode_type = unicode
 key = read_secret_key()
-SECRET = unicode(key).encode("ascii")
+if PY3:
+    SECRET = key
+    unicode_type = str
+else:
+    SECRET = unicode(key).encode("ascii")
+    unicode_type = unicode
 
 def convert(py_file):
     py_full_path = os.path.abspath(py_file)

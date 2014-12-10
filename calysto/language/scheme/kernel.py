@@ -1,7 +1,7 @@
 from __future__ import print_function
 
 from metakernel import MetaKernel
-import calysto.language.scheme
+from calysto.language.scheme import scheme
 import os
 import logging
 
@@ -13,6 +13,7 @@ class CalystoScheme(MetaKernel):
     banner = "Calysto Scheme"
     language_info = {
         'mimetype': 'text/x-scheme',
+        'name': 'scheme',
         'codemirror_mode': {'name': 'scheme'},
         'pygments_lexer': 'scheme',
     }
@@ -25,9 +26,9 @@ class CalystoScheme(MetaKernel):
     def __init__(self, *args, **kwargs):
         super(CalystoScheme, self).__init__(*args, **kwargs)
         #self.log.setLevel(logging.INFO)
-        calysto.language.scheme.ENVIRONMENT["raw_input"] = self.raw_input
-        calysto.language.scheme.ENVIRONMENT["read"] = self.raw_input
-        calysto.language.scheme.ENVIRONMENT["input"] = self.raw_input
+        scheme.ENVIRONMENT["raw_input"] = self.raw_input
+        scheme.ENVIRONMENT["read"] = self.raw_input
+        scheme.ENVIRONMENT["input"] = self.raw_input
 
     def get_usage(self):
         return """Calysto Scheme 
@@ -127,8 +128,8 @@ MAIN FEATURES
         token = info["help_obj"]
         matches = []
         # from the language environment:
-        slist = calysto.language.scheme.execute_string_rm("(dir)")
-        if not calysto.language.scheme.exception_q(slist):
+        slist = scheme.execute_string_rm("(dir)")
+        if not scheme.exception_q(slist):
             for item in slist:
                 item_str = str(item)
                 if item_str.startswith(token) and item_str not in matches:
@@ -139,15 +140,15 @@ MAIN FEATURES
                      "try", "catch", "finally", "raise", "choose"]:
             if item.startswith(token) and item not in matches:
                 matches.append(item)
-        # add items from calysto.language.scheme.ENVIRONMENT
-        for item in calysto.language.scheme.ENVIRONMENT:
+        # add items from scheme.ENVIRONMENT
+        for item in scheme.ENVIRONMENT:
             if item.startswith(token) and item not in matches:
                 matches.append(item)
         # add properties and attributes if token is "numpy.ar"
         if "." in token:
             components, partial = token.rsplit(".", 1)
-            slist = calysto.language.scheme.execute_string_rm("(dir %s)" % components)
-            if not calysto.language.scheme.exception_q(slist):
+            slist = scheme.execute_string_rm("(dir %s)" % components)
+            if not scheme.exception_q(slist):
                 for item in slist:
                     item_str = str(item)
                     if item_str.startswith(partial) and item_str not in matches:
@@ -159,27 +160,27 @@ MAIN FEATURES
         """
         Set a variable in the kernel's enviroment.
         """
-        calysto.language.scheme.ENVIRONMENT[name] = value
+        scheme.ENVIRONMENT[name] = value
 
     def get_variable(self, name):
         """
         Get a variable in the kernel's enviroment.
         """
         # search through the local env, if one
-        reg_env = calysto.language.scheme.GLOBALS["env_reg"]
+        reg_env = scheme.GLOBALS["env_reg"]
         if reg_env:
             def get_index(item, ls):
                 pos = 0
-                while ls != calysto.language.scheme.Symbol("()"):
+                while ls != scheme.Symbol("()"):
                     if item == ls.car:
                         return pos
                     ls = ls.cdr
                 return None
-            symbol_name = calysto.language.scheme.Symbol(name)
+            symbol_name = scheme.Symbol(name)
             # car 'environment
             # cadr frame: (vector of vars, names)
             current_frame = reg_env = reg_env.cdr
-            while current_frame != calysto.language.scheme.Symbol("()"):
+            while current_frame != scheme.Symbol("()"):
                 if not hasattr(current_frame, "car"): break
                 values = current_frame.car.car # vector of bindings (val . docstring)
                 names = current_frame.car.cdr.car # list
@@ -188,13 +189,13 @@ MAIN FEATURES
                     return values[index].car
                 current_frame = current_frame.cdr
         # if not found, search through ENVIRONMENT:
-        if name in calysto.language.scheme.ENVIRONMENT:
-            return calysto.language.scheme.ENVIRONMENT[name]
+        if name in scheme.ENVIRONMENT:
+            return scheme.ENVIRONMENT[name]
 
     def get_kernel_help_on(self, info, level=0, none_on_fail=False):
         expr = info["code"]
-        result = calysto.language.scheme.execute_string_rm("(help %s)" % expr)
-        if not calysto.language.scheme.exception_q(result):
+        result = scheme.execute_string_rm("(help %s)" % expr)
+        if not scheme.exception_q(result):
             return result
         elif expr in ["define", "define!", "func", "callback", "if",
                      "help", "define-syntax", "begin", "lambda", "trace-lambda",
@@ -226,8 +227,8 @@ MAIN FEATURES
         if isinstance(item, list): # a scheme vector
             items = " ".join(map(self.repr, item))
             return "#%d(%s)" % (len(item), items)
-        elif isinstance(item, calysto.language.scheme.cons): # a scheme list
-            if isinstance(item.car, calysto.language.scheme.Symbol):
+        elif isinstance(item, scheme.cons): # a scheme list
+            if isinstance(item.car, scheme.Symbol):
                 ## HACK: fix me; represent procedues and environments as objs?
                 if item.car.name == "procedure":
                     return "#<procedure>"
@@ -236,7 +237,7 @@ MAIN FEATURES
             else: # a pair
                 retval = []
                 current = item
-                while isinstance(current, calysto.language.scheme.cons): 
+                while isinstance(current, scheme.cons): 
                     ## HACK: fix me; represent procedues and environments as objs?
                     if hasattr(current.car, "name"):
                         if current.car.name == "procedure":
@@ -246,7 +247,7 @@ MAIN FEATURES
                     retval.append(self.repr(current.car))
                     current = current.cdr
                 retval = " ".join(retval)
-                if not (isinstance(current, calysto.language.scheme.Symbol) and 
+                if not (isinstance(current, scheme.Symbol) and 
                         current.name == "()"):
                     retval += " . " + self.repr(current)
                 return "(%s)" % retval
@@ -263,18 +264,18 @@ MAIN FEATURES
 
     def do_execute_file(self, filename):
         # for the %run FILENAME magic
-        calysto.language.scheme.execute_file_rm(filename);
+        scheme.execute_file_rm(filename);
         return None
 
     def do_execute_direct(self, code):
         try:
-            retval = calysto.language.scheme.execute_string_top(code, "In [%s]" % self.execution_count)
+            retval = scheme.execute_string_top(code, "In [%s]" % self.execution_count)
         except:
             return "Unhandled Error: " + code
-        if calysto.language.scheme.exception_q(retval):
-            self.Error(calysto.language.scheme.get_traceback_string(retval))
+        if scheme.exception_q(retval):
+            self.Error(scheme.get_traceback_string(retval))
             retval = None
-        if retval is calysto.language.scheme.void_value:
+        if retval is scheme.void_value:
             retval = None
         return retval
 
@@ -284,12 +285,12 @@ MAIN FEATURES
     def initialize_debug(self, code):
         self.original_debug_code = code
         self.running = True
-        calysto.language.scheme._startracing_on_q_star = True
-        calysto.language.scheme.GLOBALS["TRACE_GUI"] = True
-        calysto.language.scheme.GLOBALS["TRACE_GUI_COUNT"] = 0
+        scheme._startracing_on_q_star = True
+        scheme.GLOBALS["TRACE_GUI"] = True
+        scheme.GLOBALS["TRACE_GUI_COUNT"] = 0
         try:
-            retval = calysto.language.scheme.execute_string_rm(code)
-        except calysto.language.scheme.DebugException as e:
+            retval = scheme.execute_string_rm(code)
+        except scheme.DebugException as e:
             retval = "highlight: [%s, %s, %s, %s]" % (e.data[0], e.data[1], e.data[2], e.data[3])
         except:
             return "Unhandled Error: " + code
@@ -300,18 +301,18 @@ MAIN FEATURES
             return self.initialize_debug(self.original_debug_code)
         elif code == "stop":
             self.running = False
-            calysto.language.scheme._startracing_on_q_star = False
-            calysto.language.scheme.GLOBALS["TRACE_GUI"] = False
+            scheme._startracing_on_q_star = False
+            scheme.GLOBALS["TRACE_GUI"] = False
         elif code == "step":
             if not self.running:
-                calysto.language.scheme._startracing_on_q_star = False
-                calysto.language.scheme.GLOBALS["TRACE_GUI"] = False
+                scheme._startracing_on_q_star = False
+                scheme.GLOBALS["TRACE_GUI"] = False
                 raise StopIteration()
             try:
-                calysto.language.scheme.m()
-                retval = calysto.language.scheme.trampoline()
-            except calysto.language.scheme.DebugException as e:
-                if calysto.language.scheme.pc:
+                scheme.m()
+                retval = scheme.trampoline()
+            except scheme.DebugException as e:
+                if scheme.pc:
                     return "highlight: [%s, %s, %s, %s]" % (e.data[0], e.data[1], e.data[2], e.data[3])
                 else:
                     self.running = False
@@ -325,7 +326,7 @@ MAIN FEATURES
 
     def do_is_complete(self, code):
         # status: 'complete', 'incomplete', 'invalid', or 'unknown'
-        if calysto.language.scheme.ready_to_eval(code):
+        if scheme.ready_to_eval(code):
             return {'status' : 'complete'}
         else:
             return {'status' : 'incomplete',

@@ -1,7 +1,10 @@
 from __future__ import print_function
 
-import pexpect
-import getpass
+try:
+    import pexpect
+    import getpass
+except:
+    print("No password support")
 
 try:
     raw_input

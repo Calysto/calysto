@@ -1,4 +1,7 @@
-from distutils.core import setup
+try:
+    from setuptools.core import setup
+except ImportError:
+    from distutils.core import setup
 import sys
 
 svem_flag = '--single-version-externally-managed'
@@ -15,7 +18,14 @@ setup(name='calysto',
       url="https://github.com/Calysto/calysto",
       install_requires=['IPython', 'metakernel', 'svgwrite', 'Pillow', 
                         'cairosvg'],
-      packages=['calysto'],
+      packages=['calysto', 
+                'calysto.language', 
+                'calysto.language.scheme', 
+                'calysto.util',
+                'calysto.widget', 
+                'calysto.chart'],
+      data_files = [("calysto", ["images/logo-64x64.png", 
+                                 "images/logo-32x32.png"])],
       classifiers = [
           'Framework :: IPython',
           'License :: OSI Approved :: BSD License',

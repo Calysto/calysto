@@ -1,8 +1,8 @@
-import urllib2
+import urllib
 import re
 
 def ottobib(isbn):
-    fp = urllib2.urlopen("https://www.ottobib.com/isbn/%s/bibtex" % isbn)
+    fp = urllib.request.urlopen("https://www.ottobib.com/isbn/%s/bibtex" % isbn)
     html = fp.read()
     match = re.findall("<textarea .*?>(.*?)</textarea>", html, re.DOTALL)
     if len(match) > 0:
