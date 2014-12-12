@@ -3,7 +3,14 @@ from __future__ import print_function
 from metakernel import MetaKernel
 from calysto.language.scheme import scheme
 import os
+import sys
 import logging
+
+PY3 = (sys.version_info[0] >= 3)
+if PY3:
+    PY_STRINGS = (str,)
+else:
+    PY_STRINGS = (str, unicode)
 
 class CalystoScheme(MetaKernel):
     implementation = 'scheme'
@@ -251,7 +258,7 @@ MAIN FEATURES
                         current.name == "()"):
                     retval += " . " + self.repr(current)
                 return "(%s)" % retval
-        elif isinstance(item, (str, unicode)):
+        elif isinstance(item, PY_STRINGS):
             retval = repr(item)
             if retval.startswith("'"):
                 retval = retval.replace('"', '\\"')
