@@ -26,9 +26,9 @@ class install_with_kernelspec(install):
             install_kernel_resources(td, resource="calysto")
             log.info('Installing kernel spec')
             try:
-                install_kernel_spec(td, 'calysto_scheme', system=not self.user, replace=True)
+                install_kernel_spec(td, 'calysto_scheme', replace=True)
             except:
-                install_kernel_spec(td, 'calysto_scheme', system=False, replace=True)
+                install_kernel_spec(td, 'calysto_scheme', user=self.user, replace=True)
 
 
 svem_flag = '--single-version-externally-managed'
