@@ -91,30 +91,40 @@ class ProcessingKernel(MetaKernel):
         env = {"code": repr(code)[1:] if sys.version.startswith('2') else repr(code),
                "id": self.canvas_id}
         code = """
+<b>Sketch #%(id)s:</b><br/>
 <canvas id="canvas_%(id)s"></canvas><br/>
-<div id="state_%(id)s">Running...</div><br/>
-<button id="run_button_%(id)s" onclick="startSketch('%(id)s');" disabled>Run</button>
+<div id="state_%(id)s">Loading...</div><br/>
+<button id="run_button_%(id)s" onclick="startSketch('%(id)s');" style="color: 'grey';" disabled>Run</button>
 <button id="pause_button_%(id)s" onclick="stopSketch('%(id)s');">Pause</button>
 <button id="setup_button_%(id)s" onclick="setupSketch('%(id)s');">setup()</button>
 <button id="draw_button_%(id)s" onclick="drawSketch('%(id)s');">draw()</button>
 
 <script>
+
+function change_button(button, disable) {
+    button.disabled = disable;
+    if (disable)
+        button.style.color = "grey";
+    else
+        button.style.color = "black";
+}
+      
 function startSketch(id) {
     switchSketchState(id, true);
     document.getElementById("state_" + id).innerHTML = "Running...";
-    document.getElementById("run_button_" + id).disabled = true;
-    document.getElementById("pause_button_" + id).disabled = false;
-    document.getElementById("setup_button_" + id).disabled = true;
-    document.getElementById("draw_button_" + id).disabled = true;
+    change_button(document.getElementById("run_button_" + id), true);
+    change_button(document.getElementById("pause_button_" + id), false);
+    change_button(document.getElementById("setup_button_" + id),  true);
+    change_button(document.getElementById("draw_button_" + id), true);
 }
-      
+
 function stopSketch(id) {
     switchSketchState(id, false);
     document.getElementById("state_" + id).innerHTML = "Stopped.";
-    document.getElementById("run_button_" + id).disabled = false;
-    document.getElementById("pause_button_" + id).disabled = true;
-    document.getElementById("setup_button_" + id).disabled = false;
-    document.getElementById("draw_button_" + id).disabled = false;
+    change_button(document.getElementById("run_button_" + id), false);
+    change_button(document.getElementById("pause_button_" + id), true);
+    change_button(document.getElementById("setup_button_" + id), false);
+    change_button(document.getElementById("draw_button_" + id), false);
 }
 
 function drawSketch(id) {
@@ -122,10 +132,10 @@ function drawSketch(id) {
     document.getElementById("state_" + id).innerHTML = "Drawing...";
     processingInstance.draw();  
     document.getElementById("state_" + id).innerHTML = "Drawing... Stopped.";
-    document.getElementById("run_button_" + id).disabled = false;
-    document.getElementById("pause_button_" + id).disabled = true;
-    document.getElementById("setup_button_" + id).disabled = false;
-    document.getElementById("draw_button_" + id).disabled = false;
+    change_button(document.getElementById("run_button_" + id), false);
+    change_button(document.getElementById("pause_button_" + id), true);
+    change_button(document.getElementById("setup_button_" + id), false);
+    change_button(document.getElementById("draw_button_" + id), false);
 }
 
 function setupSketch(id) {
@@ -133,10 +143,10 @@ function setupSketch(id) {
     document.getElementById("state_" + id).innerHTML = "Setting up...";
     processingInstance.setup();  
     document.getElementById("state_" + id).innerHTML = "Setting up... Stopped.";
-    document.getElementById("run_button_" + id).disabled = false;
-    document.getElementById("pause_button_" + id).disabled = true;
-    document.getElementById("setup_button_" + id).disabled = false;
-    document.getElementById("draw_button_" + id).disabled = false;
+    change_button(document.getElementById("run_button_" + id), false);
+    change_button(document.getElementById("pause_button_" + id), true);
+    change_button(document.getElementById("setup_button_" + id), false);
+    change_button(document.getElementById("draw_button_" + id), false);
 }
 
 function switchSketchState(id, on) {
@@ -151,6 +161,7 @@ function switchSketchState(id, on) {
 require(["http://cs.brynmawr.edu/gxk2013/examples/tools/alphaChannels/processing.js"], function () {
     var processingCode = %(code)s;
     var cc;
+    var processingInstance;
     try {
         cc = Processing.compile(processingCode);
     } catch (e) {
@@ -160,12 +171,21 @@ require(["http://cs.brynmawr.edu/gxk2013/examples/tools/alphaChannels/processing
     }
     if (cc != undefined) {
         try {
-            var processingInstance = new Processing("canvas_%(id)s", cc);
+            processingInstance = new Processing("canvas_%(id)s", cc);
         } catch (e) {
             console.log(e);
             cc = Processing.compile("println('Runtime error: " + e.toString() + "');");
-            var processingInstance = new Processing("canvas_%(id)s", cc);
+            processingInstance = new Processing("canvas_%(id)s", cc);
         }
+    }
+    if (processingInstance != undefined) {
+        if (processingInstance.draw != undefined) {
+            document.getElementById("state_%(id)s").innerHTML = "Running...";
+        } else {
+            document.getElementById("state_%(id)s").innerHTML = "Done.";
+        }
+    } else {
+        document.getElementById("state_%(id)s").innerHTML = "Error.";
     }
 });
 </script>

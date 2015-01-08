@@ -23,7 +23,7 @@ class install_with_kernelspec(install):
             os.chmod(td, 0o755) # Starts off as 700, not user readable
             with open(os.path.join(td, 'kernel.json'), 'w') as f:
                 json.dump(kernel_json, f, sort_keys=True)
-            install_kernel_resources(td)
+            install_kernel_resources(td, resource="calysto")
             log.info('Installing kernel spec')
             try:
                 install_kernel_spec(td, 'calysto_processing', user=self.user, 
