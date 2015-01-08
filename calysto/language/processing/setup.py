@@ -7,10 +7,10 @@ import sys
 
 kernel_json = {
     "argv": [sys.executable, 
-	     "-m", "calysto.language.scheme.kernel", 
+	     "-m", "calysto.language.processing.kernel", 
 	     "-f", "{connection_file}"],
-    "display_name": "Calysto Scheme",
-    "name": "calysto_scheme"
+    "display_name": "Calysto Processing",
+    "name": "calysto_processing"
 }
 
 class install_with_kernelspec(install):
@@ -23,12 +23,14 @@ class install_with_kernelspec(install):
             os.chmod(td, 0o755) # Starts off as 700, not user readable
             with open(os.path.join(td, 'kernel.json'), 'w') as f:
                 json.dump(kernel_json, f, sort_keys=True)
-            install_kernel_resources(td, resource="calysto")
+            install_kernel_resources(td)
             log.info('Installing kernel spec')
             try:
-                install_kernel_spec(td, 'calysto_scheme', replace=True)
+                install_kernel_spec(td, 'calysto_processing', user=self.user, 
+                                    replace=True)
             except:
-                install_kernel_spec(td, 'calysto_scheme', user=self.user, replace=True)
+                install_kernel_spec(td, 'calysto_processing', user=not self.user, 
+                                    replace=True)
 
 
 svem_flag = '--single-version-externally-managed'
@@ -36,14 +38,13 @@ if svem_flag in sys.argv:
     # Die, setuptools, die.
     sys.argv.remove(svem_flag)
 
-setup(name='calysto_scheme',
+setup(name='calysto_processing',
       version='0.5.1',
-      description='A Scheme kernel for Jupyter/IPython',
-      long_description="A Scheme kernel for Jupyter/IPython, based on MetaKernel",
-      url="https://github.com/Calysto/calysto/tree/master/calysto/language/scheme",
+      description='A Processing kernel for Jupyter/IPython',
+      long_description="A Processing kernel for Jupyter/IPython, based on MetaKernel",
+      url="https://github.com/Calysto/calysto/language/processing",
       author='Douglas Blank',
       author_email='doug.blank@gmail.com',
-      #py_modules=['calysto_scheme'],
       install_requires=["metakernel", "calysto"],
       cmdclass={'install': install_with_kernelspec},
       classifiers = [
@@ -51,5 +52,6 @@ setup(name='calysto_scheme',
           'License :: OSI Approved :: BSD License',
           'Programming Language :: Python :: 3',
           'Programming Language :: Python :: 2',
+          'Topic :: System :: Shells',
       ]
 )

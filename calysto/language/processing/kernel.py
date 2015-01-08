@@ -1,13 +1,25 @@
-from jupyter_kernel import MagicKernel
+from metakernel import MetaKernel
 from IPython.display import HTML
 import sys
 import re
 
-class ProcessingKernel(MagicKernel):
+class ProcessingKernel(MetaKernel):
     implementation = 'Processing'
     implementation_version = '1.0'
     language = 'java'
     language_version = '0.1'
+    language_info = {
+        'mimetype': 'text/x-processing',
+        'name': 'java',
+        # ------ If different from 'language':
+        # 'codemirror_mode': {
+        #    "version": 2,
+        #    "name": "ipython"
+        # }
+        # 'pygments_lexer': 'language',
+        # 'version'       : "x.y.z",
+        'file_extension': '.pjs',
+    }
     banner = "Processing kernel - evaluates Processing programs"
     canvas_id = 0
     keywords = ["@pjs", "Array", "ArrayList", "HALF_PI",
@@ -79,12 +91,82 @@ class ProcessingKernel(MagicKernel):
         env = {"code": repr(code)[1:] if sys.version.startswith('2') else repr(code),
                "id": self.canvas_id}
         code = """
-<canvas id="canvas_%(id)s"></canvas>
+<canvas id="canvas_%(id)s"></canvas><br/>
+<div id="state_%(id)s">Running...</div><br/>
+<button id="run_button_%(id)s" onclick="startSketch('%(id)s');" disabled>Run</button>
+<button id="pause_button_%(id)s" onclick="stopSketch('%(id)s');">Pause</button>
+<button id="setup_button_%(id)s" onclick="setupSketch('%(id)s');">setup()</button>
+<button id="draw_button_%(id)s" onclick="drawSketch('%(id)s');">draw()</button>
+
 <script>
+function startSketch(id) {
+    switchSketchState(id, true);
+    document.getElementById("state_" + id).innerHTML = "Running...";
+    document.getElementById("run_button_" + id).disabled = true;
+    document.getElementById("pause_button_" + id).disabled = false;
+    document.getElementById("setup_button_" + id).disabled = true;
+    document.getElementById("draw_button_" + id).disabled = true;
+}
+      
+function stopSketch(id) {
+    switchSketchState(id, false);
+    document.getElementById("state_" + id).innerHTML = "Stopped.";
+    document.getElementById("run_button_" + id).disabled = false;
+    document.getElementById("pause_button_" + id).disabled = true;
+    document.getElementById("setup_button_" + id).disabled = false;
+    document.getElementById("draw_button_" + id).disabled = false;
+}
+
+function drawSketch(id) {
+    var processingInstance = Processing.getInstanceById("canvas_" + id);
+    document.getElementById("state_" + id).innerHTML = "Drawing...";
+    processingInstance.draw();  
+    document.getElementById("state_" + id).innerHTML = "Drawing... Stopped.";
+    document.getElementById("run_button_" + id).disabled = false;
+    document.getElementById("pause_button_" + id).disabled = true;
+    document.getElementById("setup_button_" + id).disabled = false;
+    document.getElementById("draw_button_" + id).disabled = false;
+}
+
+function setupSketch(id) {
+    var processingInstance = Processing.getInstanceById("canvas_" + id);
+    document.getElementById("state_" + id).innerHTML = "Setting up...";
+    processingInstance.setup();  
+    document.getElementById("state_" + id).innerHTML = "Setting up... Stopped.";
+    document.getElementById("run_button_" + id).disabled = false;
+    document.getElementById("pause_button_" + id).disabled = true;
+    document.getElementById("setup_button_" + id).disabled = false;
+    document.getElementById("draw_button_" + id).disabled = false;
+}
+
+function switchSketchState(id, on) {
+    var processingInstance = Processing.getInstanceById("canvas_" + id);
+    if (on) {
+        processingInstance.loop();  // call Processing loop() function
+    } else {
+        processingInstance.noLoop(); // stop animation, call noLoop()
+    }
+}
+
 require(["http://cs.brynmawr.edu/gxk2013/examples/tools/alphaChannels/processing.js"], function () {
     var processingCode = %(code)s;
-    var cc = Processing.compile(processingCode);
-    var processingInstance = new Processing("canvas_%(id)s", cc);
+    var cc;
+    try {
+        cc = Processing.compile(processingCode);
+    } catch (e) {
+        console.log(e);
+        
+        cc = Processing.compile("println('Parse error: " + e.toString() + "');");
+    }
+    if (cc != undefined) {
+        try {
+            var processingInstance = new Processing("canvas_%(id)s", cc);
+        } catch (e) {
+            console.log(e);
+            cc = Processing.compile("println('Runtime error: " + e.toString() + "');");
+            var processingInstance = new Processing("canvas_%(id)s", cc);
+        }
+    }
 });
 </script>
 """ % env
