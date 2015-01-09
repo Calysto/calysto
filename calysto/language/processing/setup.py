@@ -45,7 +45,7 @@ setup(name='calysto_processing',
       url="https://github.com/Calysto/calysto/language/processing",
       author='Douglas Blank',
       author_email='doug.blank@gmail.com',
-      install_requires=["metakernel", "calysto"],
+      install_requires=["metakernel", "calysto", "html2text"],
       cmdclass={'install': install_with_kernelspec},
       classifiers = [
           'Framework :: IPython',

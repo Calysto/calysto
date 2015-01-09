@@ -81,6 +81,49 @@ class ProcessingKernel(MetaKernel):
                     "trim", "true", "unbinary", "unhex", "updatePixels", "vertex",
                     "void", "while", "width", "year"]
 
+    processing_functions = ["draw", "exit", "loop", "noLoop", "popStyle", "redraw", "setup", "size", "cursor", "frameRate", "noCursor", "binary", "boolean", "byte", "char", "float", "hex", "int", "str", "unbinary", "unhex", "join", "match", "matchAll", "nf", "nfc", "nfp", "nfs", "split", "splitTokens", "trim", "append", "arrayCopy", "concat", "expand", "reverse", "shorten", "sort", "splice", "subset", "for", "while", "else", "if", "switch", "arc", "ellipse", "line", "point", "quad", "rect", "triangle", "bezier", "bezierDetail", "bezierPoint", "bezierTangent", "curve", "curveDetail", "curvePoint", "curveTangent", "curveTightness", "box", "sphere", "sphereDetail", "ellipseMode", "noSmooth", "rectMode", "smooth", "strokeCap", "strokeJoin", "strokeWeight", "beginShape", "bezierVertex", "curveVertex", "endShape", "texture", "textureMode", "vertex", "loadShape", "shape", "shapeMode", "mouseClicked", "mouseDragged", "mouseMoved", "mouseOut", "mouseOver", "mousePressed", "mouseReleased", "keyPressed", "keyReleased", "keyTyped", "createInput", "loadBytes", "loadStrings", "open", "selectFolder", "selectInput", "link", "param", "status", "day", "hour", "millis", "minute", "month", "second", "year", "print", "println", "save", "saveFrame", "beginRaw", "beginRecord", "createOutput", "createReader", "createWriter", "endRaw", "endRecord", "saveBytes", "saveStream", "saveStrings", "selectOutput", "applyMatrix", "popMatrix", "printMatrix", "pushMatrix", "resetMatrix", "rotate", "rotateX", "rotateY", "rotateZ", "scale", "translate", "ambientLight", "directionalLight", "lightFalloff", "lightSpecular", "lights", "noLights", "normal", "pointLight", "spotLight", "beginCamera", "camera", "endCamera", "frustum", "ortho", "perspective", "printCamera", "printProjection", "modelX", "modelY", "modelZ", "screenX", "screenY", "screenZ", "ambient", "emissive", "shininess", "specular", "background", "colorMode", "fill", "noFill", "noStroke", "stroke", "alpha", "blendColor", "blue", "brightness", "color", "green", "hue", "lerpColor", "red", "saturation", "createImage", "image", "imageMode", "loadImage", "noTint", "requestImage", "tint", "blend", "copy", "filter", "get", "loadPixels", "set", "updatePixels", "createGraphics", "hint", "createFont", "loadFont", "text", "textFont", "textAlign", "textLeading", "textMode", "textSize", "textWidth", "textAscent", "textDescent", "abs", "ceil", "constrain", "dist", "exp", "floor", "lerp", "log", "mag", "map", "max", "min", "norm", "pow", "round", "sq", "sqrt", "acos", "asin", "atan", "atan2", "cos", "degrees", "radians", "sin", "tan", "noise", "noiseDetail", "noiseSeed", "random", "randomSeed"]
+
+    special_keywords = {
+        "@pjs": "pjs%20directive",
+        "array": "array%20access",
+        "[]": "array%20access",
+        "[": "array%20access",
+        "]": "array%20access",
+        "()": "parentheses",
+        "(": "parentheses",
+        ")": "parentheses",
+        "=": "assign",
+        ",": "comma",
+        "/*": "multiline%20comment",
+        "*/": "multiline%20comment",
+        ".": "dot",
+        ";": "semicolon",
+        "+=": "add%20assign",
+        "+": "addition",
+        "--": "decrement",
+        "/": "divide",
+        "/=": "divide%20assign",
+        "++": "increment",
+        "-": "minus",
+        "%": "modulo",
+        "*": "multiply",
+        "*=": "multiply%20assign",
+        "-=": "subtract%20assign",
+        "&": "bitwise%20AND",
+        "|": "bitwise%20OR",
+        "<<": "left%20shift",
+        ">>": "right%20shift",
+        "==": "equality",
+        ">": "greater%20than",
+        ">=": "greater%20than%20or%20equal%20to",
+        "!=": "inequality",
+        "<": "less%20than",
+        "<=": "less%20than%20or%20equal%20to",
+        "&&": "logical%20AND",
+        "!": "logical%20NOT",
+        "||": "logical%20OR",
+    }
+
     def get_usage(self):
         return "This is the Processing kernel based on Processingjs.org."
 
@@ -94,66 +137,91 @@ class ProcessingKernel(MetaKernel):
 <b>Sketch #%(id)s:</b><br/>
 <canvas id="canvas_%(id)s"></canvas><br/>
 <div id="state_%(id)s">Loading...</div><br/>
-<button id="run_button_%(id)s" onclick="startSketch('%(id)s');" style="color: 'grey';" disabled>Run</button>
-<button id="pause_button_%(id)s" onclick="stopSketch('%(id)s');">Pause</button>
-<button id="setup_button_%(id)s" onclick="setupSketch('%(id)s');">setup()</button>
-<button id="draw_button_%(id)s" onclick="drawSketch('%(id)s');">draw()</button>
+<button id="run_button_%(id)s" onclick="startSketch('%(id)s');">
+  <i class="fa fa-play-circle-o" style="size: 2em;"/> Run
+</button>
+<button id="pause_button_%(id)s" onclick="pauseSketch('%(id)s');">
+  <i class="fa fa-pause" style="size: 2em;"/> Pause
+</button>
+<button id="setup_button_%(id)s" onclick="setupSketch('%(id)s');">
+  setup()
+</button>
+<button id="draw_button_%(id)s" onclick="drawSketch('%(id)s');">
+  draw()
+</button>
 
 <script>
 
 function change_button(button, disable) {
     button.disabled = disable;
-    if (disable)
+    if (disable) {
         button.style.color = "grey";
-    else
+    } else {
         button.style.color = "black";
+    }
 }
       
 function startSketch(id) {
     switchSketchState(id, true);
-    document.getElementById("state_" + id).innerHTML = "Running...";
-    change_button(document.getElementById("run_button_" + id), true);
-    change_button(document.getElementById("pause_button_" + id), false);
-    change_button(document.getElementById("setup_button_" + id),  true);
-    change_button(document.getElementById("draw_button_" + id), true);
 }
 
-function stopSketch(id) {
+function pauseSketch(id) {
     switchSketchState(id, false);
-    document.getElementById("state_" + id).innerHTML = "Stopped.";
-    change_button(document.getElementById("run_button_" + id), false);
-    change_button(document.getElementById("pause_button_" + id), true);
-    change_button(document.getElementById("setup_button_" + id), false);
-    change_button(document.getElementById("draw_button_" + id), false);
 }
 
 function drawSketch(id) {
     var processingInstance = Processing.getInstanceById("canvas_" + id);
-    document.getElementById("state_" + id).innerHTML = "Drawing...";
-    processingInstance.draw();  
-    document.getElementById("state_" + id).innerHTML = "Drawing... Stopped.";
+    if (processingInstance != undefined) {
+        if (processingInstance.draw != undefined) {
+            document.getElementById("state_%(id)s").innerHTML = "Drawing...";
+            processingInstance.draw();  
+            document.getElementById("state_%(id)s").innerHTML = "Drawing... done! Paused.";
+        } else {
+            document.getElementById("state_%(id)s").innerHTML = "No drawing() function. Paused.";
+        }
+    } else {
+        document.getElementById("state_%(id)s").innerHTML = "Error.";
+    }
     change_button(document.getElementById("run_button_" + id), false);
     change_button(document.getElementById("pause_button_" + id), true);
-    change_button(document.getElementById("setup_button_" + id), false);
-    change_button(document.getElementById("draw_button_" + id), false);
+    change_button(document.getElementById("setup_button_" + id), processingInstance.setup == undefined);
+    change_button(document.getElementById("draw_button_" + id), processingInstance.draw == undefined);
 }
 
 function setupSketch(id) {
     var processingInstance = Processing.getInstanceById("canvas_" + id);
-    document.getElementById("state_" + id).innerHTML = "Setting up...";
-    processingInstance.setup();  
-    document.getElementById("state_" + id).innerHTML = "Setting up... Stopped.";
+    if (processingInstance != undefined) {
+        if (processingInstance.setup != undefined) {
+            document.getElementById("state_%(id)s").innerHTML = "Setting up...";
+            processingInstance.setup();  
+            document.getElementById("state_%(id)s").innerHTML = "Setting up... done! Paused.";
+        } else {
+            document.getElementById("state_%(id)s").innerHTML = "No setup() function. Paused.";
+        }
+    } else {
+        document.getElementById("state_%(id)s").innerHTML = "Error.";
+    }
     change_button(document.getElementById("run_button_" + id), false);
     change_button(document.getElementById("pause_button_" + id), true);
-    change_button(document.getElementById("setup_button_" + id), false);
-    change_button(document.getElementById("draw_button_" + id), false);
+    change_button(document.getElementById("setup_button_" + id), processingInstance.setup == undefined);
+    change_button(document.getElementById("draw_button_" + id), processingInstance.draw == undefined);
 }
 
 function switchSketchState(id, on) {
     var processingInstance = Processing.getInstanceById("canvas_" + id);
     if (on) {
+        document.getElementById("state_" + id).innerHTML = "Running...";
+        change_button(document.getElementById("run_button_" + id), true);
+        change_button(document.getElementById("pause_button_" + id), false);
+        change_button(document.getElementById("setup_button_" + id),  true);
+        change_button(document.getElementById("draw_button_" + id), true);
         processingInstance.loop();  // call Processing loop() function
     } else {
+        document.getElementById("state_" + id).innerHTML = "Paused.";
+        change_button(document.getElementById("run_button_" + id), false);
+        change_button(document.getElementById("pause_button_" + id), true);
+        change_button(document.getElementById("setup_button_" + id), processingInstance.setup == undefined);
+        change_button(document.getElementById("draw_button_" + id), processingInstance.draw == undefined);
         processingInstance.noLoop(); // stop animation, call noLoop()
     }
 }
@@ -181,11 +249,23 @@ require(["http://cs.brynmawr.edu/gxk2013/examples/tools/alphaChannels/processing
     if (processingInstance != undefined) {
         if (processingInstance.draw != undefined) {
             document.getElementById("state_%(id)s").innerHTML = "Running...";
+            change_button(document.getElementById("run_button_%(id)s"), true);
+            change_button(document.getElementById("pause_button_%(id)s"), false);
+            change_button(document.getElementById("setup_button_%(id)s"),  true);
+            change_button(document.getElementById("draw_button_%(id)s"), true);
         } else {
             document.getElementById("state_%(id)s").innerHTML = "Done.";
+            change_button(document.getElementById("run_button_%(id)s"), true);
+            change_button(document.getElementById("pause_button_%(id)s"), true);
+            change_button(document.getElementById("setup_button_%(id)s"),  processingInstance.setup == undefined);
+            change_button(document.getElementById("draw_button_%(id)s"), true);
         }
     } else {
         document.getElementById("state_%(id)s").innerHTML = "Error.";
+        change_button(document.getElementById("run_button_%(id)s"), true);
+        change_button(document.getElementById("pause_button_%(id)s"), true);
+        change_button(document.getElementById("setup_button_%(id)s"),  true);
+        change_button(document.getElementById("draw_button_%(id)s"), true);
     }
 });
 </script>
@@ -194,13 +274,21 @@ require(["http://cs.brynmawr.edu/gxk2013/examples/tools/alphaChannels/processing
         self.Display(html)
 
     def get_completions(self, info):
-        token = info["code"]
-        return [command for command in self.keywords if command.startswith(token)]
+        token = info["full_obj"]
+        self.last_info = info
+        return [command for command in set(self.keywords + self.processing_functions) if command.startswith(token)]
 
     def get_kernel_help_on(self, info, level=0, none_on_fail=False):
-        expr = info["code"]
-        if expr in self.keywords:
+        expr = info["full_obj"]
+        self.last_info = info
+        url = None
+        if expr in self.special_keywords:
+            url = "http://processingjs.org/reference/%s/" % self.special_keywords[expr]
+        elif expr in self.processing_functions:
             url = "http://processingjs.org/reference/%s_/" % expr
+        elif expr in self.keywords:
+            url = "http://processingjs.org/reference/%s/" % expr
+        if url:
             try:
                 import html2text
                 import urllib
@@ -210,7 +298,7 @@ require(["http://cs.brynmawr.edu/gxk2013/examples/tools/alphaChannels/processing
             visible_text = html2text.html2text(html)
             pattern = re.compile("(.*?)### ", re.DOTALL)
             visible_text = re.sub(pattern, "### ", visible_text, 1)
-            return visible_text
+            return "Processing help from " + url + ":\n" + visible_text
         elif none_on_fail:
             return None
         else:
