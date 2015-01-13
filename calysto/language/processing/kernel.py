@@ -1,5 +1,5 @@
 from metakernel import MetaKernel
-from IPython.display import HTML
+from IPython.display import HTML, Javascript
 import sys
 import re
 
@@ -128,28 +128,31 @@ class ProcessingKernel(MetaKernel):
         return "This is the Processing kernel based on Processingjs.org."
 
     def do_execute_direct(self, code):
+        if code.strip() == "":
+            return
         self.canvas_id += 1
         """%%processing - run contents of cell as a Processing script"""
 
         env = {"code": repr(code)[1:] if sys.version.startswith('2') else repr(code),
                "id": self.canvas_id}
         code = """
-<b>Sketch #%(id)s:</b><br/>
-<canvas id="canvas_%(id)s"></canvas><br/>
-<div id="state_%(id)s">Loading...</div><br/>
-<button id="run_button_%(id)s" onclick="startSketch('%(id)s');">
-  <i class="fa fa-play-circle-o" style="size: 2em;"/> Run
-</button>
-<button id="pause_button_%(id)s" onclick="pauseSketch('%(id)s');">
-  <i class="fa fa-pause" style="size: 2em;"/> Pause
-</button>
-<button id="setup_button_%(id)s" onclick="setupSketch('%(id)s');">
-  setup()
-</button>
-<button id="draw_button_%(id)s" onclick="drawSketch('%(id)s');">
-  draw()
-</button>
-
+<div id="sketch_%(id)s">
+  <b>Sketch #%(id)s:</b><br/>
+  <canvas id="canvas_%(id)s"></canvas><br/>
+  <button id="run_button_%(id)s" onclick="startSketch('%(id)s');">
+    <i class="fa fa-play-circle-o" style="size: 2em;"/> Run
+  </button>
+  <button id="pause_button_%(id)s" onclick="pauseSketch('%(id)s');">
+    <i class="fa fa-pause" style="size: 2em;"/> Pause
+  </button>
+  <button id="setup_button_%(id)s" onclick="setupSketch('%(id)s');">
+    setup()
+  </button>
+  <button id="draw_button_%(id)s" onclick="drawSketch('%(id)s');">
+    draw()
+  </button>
+</div>
+<b>Sketch #%(id)s state:</b> <span id="state_%(id)s">Loading...</span><br/>
 <script>
 
 function change_button(button, disable) {
@@ -173,16 +176,21 @@ function drawSketch(id) {
     var processingInstance = Processing.getInstanceById("canvas_" + id);
     if (processingInstance != undefined) {
         if (processingInstance.draw != undefined) {
-            document.getElementById("state_%(id)s").innerHTML = "Drawing...";
-            processingInstance.draw();  
-            document.getElementById("state_%(id)s").innerHTML = "Drawing... done! Paused.";
+            document.getElementById("state_" + id).innerHTML = "Drawing...";
+            try {
+                processingInstance.redraw();  
+                document.getElementById("state_" + id).innerHTML = "Drawing... done! Paused.";
+            } catch (e) {
+                processingInstance.println(e.toString());
+                document.getElementById("state_" + id).innerHTML = e.toString();
+            }
         } else {
-            document.getElementById("state_%(id)s").innerHTML = "No drawing() function. Paused.";
+            document.getElementById("state_" + id).innerHTML = "No drawing() function. Paused.";
         }
     } else {
-        document.getElementById("state_%(id)s").innerHTML = "Error.";
+        document.getElementById("state_" + id).innerHTML = "Error.";
     }
-    change_button(document.getElementById("run_button_" + id), false);
+    change_button(document.getElementById("run_button_" + id), processingInstance.draw == undefined);
     change_button(document.getElementById("pause_button_" + id), true);
     change_button(document.getElementById("setup_button_" + id), processingInstance.setup == undefined);
     change_button(document.getElementById("draw_button_" + id), processingInstance.draw == undefined);
@@ -192,16 +200,21 @@ function setupSketch(id) {
     var processingInstance = Processing.getInstanceById("canvas_" + id);
     if (processingInstance != undefined) {
         if (processingInstance.setup != undefined) {
-            document.getElementById("state_%(id)s").innerHTML = "Setting up...";
-            processingInstance.setup();  
-            document.getElementById("state_%(id)s").innerHTML = "Setting up... done! Paused.";
+            document.getElementById("state_" + id).innerHTML = "Setting up...";
+            try {
+                processingInstance.setup();  
+                document.getElementById("state_" + id).innerHTML = "Setting up... done! Paused.";
+            } catch (e) {
+                processingInstance.println(e.toString());
+                document.getElementById("state_" + id).innerHTML = e.toString();
+            }
         } else {
-            document.getElementById("state_%(id)s").innerHTML = "No setup() function. Paused.";
+            document.getElementById("state_" + id).innerHTML = "No setup() function. Paused.";
         }
     } else {
-        document.getElementById("state_%(id)s").innerHTML = "Error.";
+        document.getElementById("state_" + id).innerHTML = "Error.";
     }
-    change_button(document.getElementById("run_button_" + id), false);
+    change_button(document.getElementById("run_button_" + id), processingInstance.draw == undefined);
     change_button(document.getElementById("pause_button_" + id), true);
     change_button(document.getElementById("setup_button_" + id), processingInstance.setup == undefined);
     change_button(document.getElementById("draw_button_" + id), processingInstance.draw == undefined);
@@ -212,13 +225,13 @@ function switchSketchState(id, on) {
     if (on) {
         document.getElementById("state_" + id).innerHTML = "Running...";
         change_button(document.getElementById("run_button_" + id), true);
-        change_button(document.getElementById("pause_button_" + id), false);
+        change_button(document.getElementById("pause_button_" + id), processingInstance.draw == undefined);
         change_button(document.getElementById("setup_button_" + id),  true);
         change_button(document.getElementById("draw_button_" + id), true);
         processingInstance.loop();  // call Processing loop() function
     } else {
         document.getElementById("state_" + id).innerHTML = "Paused.";
-        change_button(document.getElementById("run_button_" + id), false);
+        change_button(document.getElementById("run_button_" + id), processingInstance.draw == undefined);
         change_button(document.getElementById("pause_button_" + id), true);
         change_button(document.getElementById("setup_button_" + id), processingInstance.setup == undefined);
         change_button(document.getElementById("draw_button_" + id), processingInstance.draw == undefined);
@@ -226,50 +239,74 @@ function switchSketchState(id, on) {
     }
 }
 
-require(["http://cs.brynmawr.edu/gxk2013/examples/tools/alphaChannels/processing.js"], function () {
+require(["http://cs.brynmawr.edu/~dblank/processing/processing.min.js"], function () {
     var processingCode = %(code)s;
     var cc;
     var processingInstance;
+    var has_error = false;
     try {
         cc = Processing.compile(processingCode);
     } catch (e) {
         console.log(e);
-        
-        cc = Processing.compile("println('Parse error: " + e.toString() + "');");
+        cc = Processing.compile("println('" + e.toString() + "');");
+        document.getElementById("state_%(id)s").innerHTML = e.toString();
+        has_error = true;
     }
     if (cc != undefined) {
         try {
             processingInstance = new Processing("canvas_%(id)s", cc);
         } catch (e) {
             console.log(e);
-            cc = Processing.compile("println('Runtime error: " + e.toString() + "');");
+            cc = Processing.compile("println('" + e.toString() + "');");
+            document.getElementById("state_%(id)s").innerHTML = e.toString();
             processingInstance = new Processing("canvas_%(id)s", cc);
+            has_error = true;
         }
     }
     if (processingInstance != undefined) {
+        if (processingInstance.externals.context == undefined) {
+            document.getElementById("sketch_%(id)s").style.display = "none";
+        } 
         if (processingInstance.draw != undefined) {
-            document.getElementById("state_%(id)s").innerHTML = "Running...";
+            if (!has_error) {
+                document.getElementById("state_%(id)s").innerHTML = "Running...";
+            }
             change_button(document.getElementById("run_button_%(id)s"), true);
             change_button(document.getElementById("pause_button_%(id)s"), false);
             change_button(document.getElementById("setup_button_%(id)s"),  true);
             change_button(document.getElementById("draw_button_%(id)s"), true);
         } else {
-            document.getElementById("state_%(id)s").innerHTML = "Done.";
+            if (!has_error) {
+                document.getElementById("state_%(id)s").innerHTML = "Done.";
+            }
             change_button(document.getElementById("run_button_%(id)s"), true);
             change_button(document.getElementById("pause_button_%(id)s"), true);
             change_button(document.getElementById("setup_button_%(id)s"),  processingInstance.setup == undefined);
             change_button(document.getElementById("draw_button_%(id)s"), true);
         }
     } else {
-        document.getElementById("state_%(id)s").innerHTML = "Error.";
+        document.getElementById("sketch_%(id)s").style.display = "none";
+        if (!has_error) {
+            document.getElementById("state_%(id)s").innerHTML = "Error.";
+        }
         change_button(document.getElementById("run_button_%(id)s"), true);
         change_button(document.getElementById("pause_button_%(id)s"), true);
         change_button(document.getElementById("setup_button_%(id)s"),  true);
         change_button(document.getElementById("draw_button_%(id)s"), true);
     }
 });
+
 </script>
 """ % env
+        js = Javascript("""
+        var component = document.getElementById("sketch_%(id)s");
+        if (component != undefined)
+            component.remove();
+        component = document.getElementById("state_%(id)s");
+        if (component != undefined)
+            component.remove();
+        """ % env)
+        self.Display(js)
         html = HTML(code)
         self.Display(html)
 
