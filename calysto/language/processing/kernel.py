@@ -136,9 +136,11 @@ class ProcessingKernel(MetaKernel):
         env = {"code": repr(code)[1:] if sys.version.startswith('2') else repr(code),
                "id": self.canvas_id}
         code = """
-<div id="sketch_%(id)s">
+<div id="canvas_div_%(id)s">
   <b>Sketch #%(id)s:</b><br/>
   <canvas id="canvas_%(id)s"></canvas><br/>
+</div>
+<div id="controls_div_%(id)s">
   <button id="run_button_%(id)s" onclick="startSketch('%(id)s');">
     <i class="fa fa-play-circle-o" style="size: 2em;"/> Run
   </button>
@@ -180,15 +182,19 @@ function drawSketch(id) {
             try {
                 processingInstance.redraw();  
                 document.getElementById("state_" + id).innerHTML = "Drawing... done! Paused.";
+                document.getElementById("state_" + id).style.color = "blue";
             } catch (e) {
                 processingInstance.println(e.toString());
                 document.getElementById("state_" + id).innerHTML = e.toString();
+                document.getElementById("state_" + id).style.color = "red";
             }
         } else {
             document.getElementById("state_" + id).innerHTML = "No drawing() function. Paused.";
+            document.getElementById("state_" + id).style.color = "blue";
         }
     } else {
         document.getElementById("state_" + id).innerHTML = "Error.";
+        document.getElementById("state_" + id).style.color = "red";
     }
     change_button(document.getElementById("run_button_" + id), processingInstance.draw == undefined);
     change_button(document.getElementById("pause_button_" + id), true);
@@ -204,15 +210,19 @@ function setupSketch(id) {
             try {
                 processingInstance.setup();  
                 document.getElementById("state_" + id).innerHTML = "Setting up... done! Paused.";
+                document.getElementById("state_" + id).style.color = "blue";
             } catch (e) {
                 processingInstance.println(e.toString());
                 document.getElementById("state_" + id).innerHTML = e.toString();
+                document.getElementById("state_" + id).style.color = "red";
             }
         } else {
             document.getElementById("state_" + id).innerHTML = "No setup() function. Paused.";
+            document.getElementById("state_" + id).style.color = "blue";
         }
     } else {
         document.getElementById("state_" + id).innerHTML = "Error.";
+        document.getElementById("state_" + id).style.color = "red";
     }
     change_button(document.getElementById("run_button_" + id), processingInstance.draw == undefined);
     change_button(document.getElementById("pause_button_" + id), true);
@@ -224,6 +234,7 @@ function switchSketchState(id, on) {
     var processingInstance = Processing.getInstanceById("canvas_" + id);
     if (on) {
         document.getElementById("state_" + id).innerHTML = "Running...";
+        document.getElementById("state_" + id).style.color = "green";
         change_button(document.getElementById("run_button_" + id), true);
         change_button(document.getElementById("pause_button_" + id), processingInstance.draw == undefined);
         change_button(document.getElementById("setup_button_" + id),  true);
@@ -231,6 +242,7 @@ function switchSketchState(id, on) {
         processingInstance.loop();  // call Processing loop() function
     } else {
         document.getElementById("state_" + id).innerHTML = "Paused.";
+        document.getElementById("state_" + id).style.color = "blue";
         change_button(document.getElementById("run_button_" + id), processingInstance.draw == undefined);
         change_button(document.getElementById("pause_button_" + id), true);
         change_button(document.getElementById("setup_button_" + id), processingInstance.setup == undefined);
@@ -239,7 +251,7 @@ function switchSketchState(id, on) {
     }
 }
 
-require(["http://cs.brynmawr.edu/~dblank/processing/processing.min.js"], function () {
+require(["http://cs.brynmawr.edu/~dblank/processing/processing.js"], function () {
     var processingCode = %(code)s;
     var cc;
     var processingInstance;
@@ -250,6 +262,7 @@ require(["http://cs.brynmawr.edu/~dblank/processing/processing.min.js"], functio
         console.log(e);
         cc = Processing.compile("println('" + e.toString() + "');");
         document.getElementById("state_%(id)s").innerHTML = e.toString();
+        document.getElementById("state_%(id)s").style.color = "red";
         has_error = true;
     }
     if (cc != undefined) {
@@ -259,17 +272,22 @@ require(["http://cs.brynmawr.edu/~dblank/processing/processing.min.js"], functio
             console.log(e);
             cc = Processing.compile("println('" + e.toString() + "');");
             document.getElementById("state_%(id)s").innerHTML = e.toString();
+            document.getElementById("state_%(id)s").style.color = "red";
             processingInstance = new Processing("canvas_%(id)s", cc);
             has_error = true;
         }
     }
     if (processingInstance != undefined) {
         if (processingInstance.externals.context == undefined) {
-            document.getElementById("sketch_%(id)s").style.display = "none";
+            document.getElementById("canvas_div_%(id)s").style.display = "none";
+        }
+        if (!(processingInstance.isRunning() && processingInstance.draw != undefined)) {
+            document.getElementById("controls_div_%(id)s").style.display = "none";
         } 
         if (processingInstance.draw != undefined) {
             if (!has_error) {
                 document.getElementById("state_%(id)s").innerHTML = "Running...";
+                document.getElementById("state_%(id)s").style.color = "green";
             }
             change_button(document.getElementById("run_button_%(id)s"), true);
             change_button(document.getElementById("pause_button_%(id)s"), false);
@@ -278,6 +296,7 @@ require(["http://cs.brynmawr.edu/~dblank/processing/processing.min.js"], functio
         } else {
             if (!has_error) {
                 document.getElementById("state_%(id)s").innerHTML = "Done.";
+                document.getElementById("state_%(id)s").style.color = "blue";
             }
             change_button(document.getElementById("run_button_%(id)s"), true);
             change_button(document.getElementById("pause_button_%(id)s"), true);
@@ -285,9 +304,11 @@ require(["http://cs.brynmawr.edu/~dblank/processing/processing.min.js"], functio
             change_button(document.getElementById("draw_button_%(id)s"), true);
         }
     } else {
-        document.getElementById("sketch_%(id)s").style.display = "none";
+        document.getElementById("canvas_div_%(id)s").style.display = "none";
+        document.getElementById("controls_div_%(id)s").style.display = "none";
         if (!has_error) {
             document.getElementById("state_%(id)s").innerHTML = "Error.";
+            document.getElementById("state_%(id)s").style.color = "red";
         }
         change_button(document.getElementById("run_button_%(id)s"), true);
         change_button(document.getElementById("pause_button_%(id)s"), true);
@@ -305,6 +326,12 @@ require(["http://cs.brynmawr.edu/~dblank/processing/processing.min.js"], functio
         component = document.getElementById("state_%(id)s");
         if (component != undefined)
             component.remove();
+        require(["http://cs.brynmawr.edu/~dblank/processing/processing.js"], function() {
+            // FIXME: Stop all previously running versions (?)
+            var processingInstance = Processing.getInstanceById("canvas_%(id)s");
+            if (processingInstance != undefined && processingInstance.isRunning())
+                processingInstance.noLoop();
+        });
         """ % env)
         self.Display(js)
         html = HTML(code)
