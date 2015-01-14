@@ -59,6 +59,9 @@ class Canvas(object):
             shape._add(canvas)
         return canvas.tostring()
 
+    def _repr_png_(self):
+        return self.convert(format="png")
+
     def __str__(self):
         return self._repr_svg_()
 

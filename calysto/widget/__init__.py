@@ -1,16 +1,14 @@
 from io import BytesIO
 
-from IPython.core import display
 from PIL import Image
 
-from .camera import Camera
 from calysto.chart import GoogleChart
 
-__all__ = ['Camera', 'GoogleChart']
+__all__ = ['GoogleChart']
 
 def display_pil_image(im):
    """Displayhook function for PIL Images, rendered as PNG."""
-
+   from IPython.core import display
    b = BytesIO()
    im.save(b, format='png')
    data = b.getvalue()
