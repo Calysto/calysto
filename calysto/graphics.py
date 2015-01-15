@@ -15,6 +15,7 @@ import svgwrite
 from svgwrite import cm, em, ex, mm, pc, pt, px
 import cairosvg
 import numpy
+import math
 from cairosvg.parser import Tree
 
 class Canvas(object):
@@ -26,6 +27,9 @@ class Canvas(object):
         self.extras = extras
         self.shapes = []
         self._viewbox = None
+
+    def __repr__(self):
+        return "<Canvas %s>" % str(self.size)
 
     def _render(self):
         canvas = svgwrite.Drawing(self.filename, self.size, **self.extras)
@@ -126,36 +130,65 @@ class Color(object):
         self.alpha = a
 
 class Shape(object):
-    def __init__(self):
-        self.canvas = None
-
-    def draw(self, canvas):
-        canvas.draw(self)
-        return canvas
-
-    def undraw(self, canvas):
-        canvas.undraw(self)
-        return canvas
-
-class Circle(Shape):
-    def __init__(self, center=(0,0), radius=1, **extra):
-        super(Circle, self).__init__()
+    def __init__(self, center=(0,0), **extra):
+        self.center = list(center)
         if "fill" not in extra:
             extra["fill"] = "purple"
         if "stroke" not in extra:
             extra["stroke"] = "black"
         if "stroke_width" not in extra:
             extra["stroke_width"] = 1
-        self.center = center
+        self.extra = extra
+        self.canvas = None
+        self.direction = 0
+        self.pen = False
+
+    def __repr__(self):
+        return "<Shape %s>" % self.center
+
+    def draw(self, canvas):
+        canvas.draw(self)
+        return canvas
+
+    def _add(self, drawing):
+        pass
+
+    def undraw(self, canvas):
+        canvas.undraw(self)
+        return canvas
+
+    def forward(self, distance):
+        start = self.center[:]
+        self.center[0] += distance * math.cos(self.direction)
+        self.center[1] += distance * math.sin(self.direction)
+        if self.pen and self.canvas:
+            Line(start, self.center, **self.extra).draw(self.canvas)
+            return self.canvas
+
+    def rotate(self, degrees): 
+        self.direction -= (math.pi / 180.0) * degrees
+
+class Circle(Shape):
+    def __init__(self, center=(0,0), radius=1, **extra):
+        super(Circle, self).__init__(center)
+        if "fill" not in extra:
+            extra["fill"] = "purple"
+        if "stroke" not in extra:
+            extra["stroke"] = "black"
+        if "stroke_width" not in extra:
+            extra["stroke_width"] = 1
         self.radius = radius
         self.extra = extra
 
+    def __repr__(self):
+        return "<Circle %s, r=%s>" % (self.center, self.radius)
+
     def moveTo(self, center):
-        self.center = center
+        self.center = list(center)
         return self.canvas
 
     def move(self, delta):
-        self.center = self.center[0] + delta[0], self.center[1] + delta[1]
+        self.center = [self.center[0] + delta[0], self.center[1] + delta[1]]
         return self.canvas
 
     def _add(self, drawing):
@@ -168,9 +201,12 @@ class Line(Shape):
             extra["stroke"] = "black"
         if "stroke_width" not in extra:
             extra["stroke_width"] = 1
-        self.start = start
-        self.end = end
+        self.start = list(start)
+        self.end = list(end)
         self.extra = extra
+
+    def __repr__(self):
+        return "<Line %s, %s>" % (self.start, self.end)
 
     def moveTo(self, start):
         diff_x = start[0] - self.start[0]
@@ -191,8 +227,11 @@ class Text(Shape):
     def __init__(self, text="", start=(0,0), **extra):
         super(Text, self).__init__()
         self.text = text
-        self.start = start
+        self.start = list(start)
         self.extra = extra
+
+    def __repr__(self):
+        return "<Text %s>" % self.start
 
     def moveTo(self, start):
         self.start = start
@@ -214,11 +253,14 @@ class Rectangle(Shape):
             extra["stroke"] = "black"
         if "stroke_width" not in extra:
             extra["stroke_width"] = 1
-        self.start = start
-        self.size = size
+        self.start = list(start)
+        self.size = list(size)
         self.rx = rx
         self.ry = ry
         self.extra = extra
+
+    def __repr__(self):
+        return "<Rectangle %s,%s>" % (self.start, self.size)
 
     def moveTo(self, start):
         self.start = start
@@ -233,23 +275,25 @@ class Rectangle(Shape):
 
 class Ellipse(Shape):
     def __init__(self, center=(0,0), radii=(1,1), **extra):
-        super(Ellipse, self).__init__()
+        super(Ellipse, self).__init__(center)
         if "fill" not in extra:
             extra["fill"] = "purple"
         if "stroke" not in extra:
             extra["stroke"] = "black"
         if "stroke_width" not in extra:
             extra["stroke_width"] = 1
-        self.center = center
         self.radii = radii
         self.extra = extra
 
+    def __repr__(self):
+        return "<Ellipse %s>" % str(self.radii)
+
     def moveTo(self, center):
-        self.center = center
+        self.center = list(center)
         return self.canvas
 
     def move(self, delta):
-        self.center = self.center[0] + delta[0], self.center[1] + delta[1]
+        self.center = [self.center[0] + delta[0], self.center[1] + delta[1]]
         return self.canvas
 
     def _add(self, drawing):
@@ -258,8 +302,11 @@ class Ellipse(Shape):
 class Polyline(Shape):
     def __init__(self, points=[], **extra):
         super(Polyline, self).__init__()
-        self.points = points
+        self.points = points[:]
         self.extra = extra
+
+    def __repr__(self):
+        return "<Polyline %s>" % str(self.points)
 
     def moveTo(self, start):
         diff_x = start[0] - self.points[0][0]
@@ -285,8 +332,11 @@ class Polygon(Shape):
             extra["stroke"] = "black"
         if "stroke_width" not in extra:
             extra["stroke_width"] = 1
-        self.points = points
+        self.points = points[:]
         self.extra = extra
+
+    def __repr__(self):
+        return "<Polygon %s>" % str(self.points)
 
     def moveTo(self, start):
         diff_x = start[0] - self.points[0][0]
@@ -310,6 +360,9 @@ class Picture(Shape):
         self.start = start
         self.size = size
         self.extra = extra
+
+    def __repr__(self):
+        return "<Picture %s,%s>" % (self.start, self.size)
 
     def moveTo(self, start):
         self.start = start
