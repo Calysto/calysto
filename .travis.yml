@@ -24,7 +24,7 @@ install:
     - python setup.py install
     - cd ..
 
-    - travis_retry git clone --recursive https://github.com/blink1073/metakernel
+    - travis_retry git clone --recursive https://github.com/calysto/metakernel
     - cd metakernel
     - python setup.py install
     - cd ..
