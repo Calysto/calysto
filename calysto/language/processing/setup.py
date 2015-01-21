@@ -10,6 +10,7 @@ kernel_json = {
 	     "-m", "calysto.language.processing.kernel", 
 	     "-f", "{connection_file}"],
     "display_name": "Calysto Processing",
+    "language": "processing",
     "name": "calysto_processing"
 }
 
