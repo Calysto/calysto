@@ -142,10 +142,12 @@ class ProcessingKernel(MetaKernel):
 </div>
 <div id="controls_div_%(id)s">
   <button id="run_button_%(id)s" onclick="startSketch('%(id)s');">
-    <i class="fa fa-play-circle-o" style="size: 2em;"/> Run
+    <i class="fa fa-play-circle-o" style="size: 2em;"></i> 
+        Run
   </button>
   <button id="pause_button_%(id)s" onclick="pauseSketch('%(id)s');">
-    <i class="fa fa-pause" style="size: 2em;"/> Pause
+    <i class="fa fa-pause" style="size: 2em;"></i> 
+        Pause
   </button>
   <button id="setup_button_%(id)s" onclick="setupSketch('%(id)s');">
     setup()
@@ -278,9 +280,13 @@ require(["http://cs.brynmawr.edu/~dblank/processing/processing.js"], function ()
         }
     }
     if (processingInstance != undefined) {
-        if (processingInstance.externals.context == undefined) {
-            document.getElementById("canvas_div_%(id)s").style.display = "none";
-        }
+        setTimeout(function () {
+            // Canvas:
+            if (processingInstance.externals.context === undefined) {
+                document.getElementById("canvas_div_%(id)s").style.display = "none";
+            } 
+        }, 100);
+        // Controls:
         if (!(processingInstance.isRunning() && processingInstance.draw != undefined)) {
             document.getElementById("controls_div_%(id)s").style.display = "none";
         } 
@@ -324,6 +330,9 @@ require(["http://cs.brynmawr.edu/~dblank/processing/processing.js"], function ()
         if (component != undefined)
             component.remove();
         component = document.getElementById("state_%(id)s");
+        if (component != undefined)
+            component.remove();
+        component = document.getElementById("controls_div_%(id)s");
         if (component != undefined)
             component.remove();
         require(["http://cs.brynmawr.edu/~dblank/processing/processing.js"], function() {
