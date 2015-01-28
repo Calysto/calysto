@@ -8,5 +8,6 @@ Homepage: http://calysto.github.io/
 
 ```shell
 $ pip install calysto
+$ pip3 install calysto
 ```
 
