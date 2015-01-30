@@ -40,7 +40,7 @@ if svem_flag in sys.argv:
     sys.argv.remove(svem_flag)
 
 setup(name='calysto_processing',
-      version='0.5.1',
+      version='0.7.0',
       description='A Processing kernel for Jupyter/IPython',
       long_description="A Processing kernel for Jupyter/IPython, based on MetaKernel",
       url="https://github.com/Calysto/calysto/language/processing",
