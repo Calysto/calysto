@@ -15,12 +15,15 @@ from __future__ import division, print_function
 
 import inspect
 import fractions
+import functools
 import operator
 import types
 import math
 import time
 import sys
 import os
+
+PY3 = sys.version_info[0] == 3
 
 #############################################################
 # Python implementation notes:
@@ -292,7 +295,7 @@ def make_comparison_function(procedure):
     return compare
 
 def apply_comparison(p, carl, cadrl):
-    return apply(p, [carl, cadrl])
+    return p(carl, cadrl)
 
 ## usage: (partition 4 '(6 4 2 1 7) () ()) -> returns partitions
 def partition (p, piv, l, p1, p2):
@@ -521,7 +524,10 @@ def char_q(item):
     return isinstance(item, Char)
 
 def string_q(item):
-    return isinstance(item, str)
+    if PY3:
+        return isinstance(item, str)
+    else:
+        return isinstance(item, (str, unicode))
 
 def char_whitespace_q(c):
     return c.char in [' ', '\t', '\n', '\r']
@@ -537,7 +543,7 @@ def char_is__q(c1, c2):
     return c1 == c2
 
 def number_q(item):
-    return isinstance(item, (int, long, float, fractions.Fraction))
+    return isinstance(item, (int, float, fractions.Fraction))
 
 def null_q(item):
     return item is symbol_emptylist
@@ -607,7 +613,7 @@ def sqrt(number):
     return math.sqrt(number)
 
 def plus(*args):
-    return reduce(operator.add, args, 0)
+    return functools.reduce(operator.add, args, 0)
 
 def minus(*args):
     if len(args) == 0:
@@ -615,10 +621,10 @@ def minus(*args):
     elif len(args) == 1:
         return -args[0]
     else:
-        return reduce(operator.sub, args[1:], args[0])
+        return functools.reduce(operator.sub, args[1:], args[0])
 
 def multiply(*args):
-    return reduce(operator.mul, args, 1)
+    return functools.reduce(operator.mul, args, 1)
 
 def divide(*args):
     try:
@@ -632,7 +638,7 @@ def divide(*args):
                 current = fractions.Fraction(current, arg)
             return current
     except:
-        return reduce(operator.div, args)
+        return functools.reduce(operator.div, args)
 
 def Equal(o1, o2):
     if boolean_q(o1) or boolean_q(o2):
@@ -772,7 +778,7 @@ def substring(s, start, stop):
 ### Functions:
 
 def Apply(f, lyst):
-    return apply(f, list_to_vector(lyst))
+    return f(*list_to_vector(lyst))
 
 ### Annotated expression support:
 
@@ -820,7 +826,7 @@ def trampoline():
                 #extra += "\nLocals:\n"
                 #for arg in arginfo.locals:
                 #    extra += "   %s = %s\n" % (arg, repr(arginfo.locals[arg]))
-                exception_reg = make_exception("UnhandledException", e.message, symbol_none, symbol_none, symbol_none)
+                exception_reg = make_exception("UnhandledException", str(e), symbol_none, symbol_none, symbol_none)
                 pc = apply_handler2
     return final_reg
 
@@ -843,7 +849,10 @@ def read_multiline(prompt):
         try:
             if retval:
                 retval += "\n"
-            retval += raw_input(prompt) ## Python 2
+            if PY3:
+                retval += input(prompt) ## Python 3
+            else:
+                retval += raw_input(prompt) ## Python 2
             prompt = "... "
         except EOFError:
             return "(exit)"
@@ -988,22 +997,34 @@ def apply_with_keywords(*args):
 def import_native(libraries, environment):
     env = {}
     for library in libraries:
-        exec ("import %s" % library) in env
+        if PY3:
+            exec("import %s" % library, env)
+        else:
+            exec ("import %s" % library) in env
     ENVIRONMENT.update(env)
     return List(*[make_symbol(name) for name in env.keys() if not name.startswith("_")])
 
 def import_as_native(library, name, environment):
     env = {}
     if name == make_symbol("*") or name == "*":
-        exec ("from %s import *" % library) in env
+        if PY3:
+            exec("from %s import *" % library, env)
+        else:
+            exec ("from %s import *" % library) in env
     else:
-        exec ("import %s as %s" % (library, name)) in env
+        if PY3:
+            exec("import %s as %s" % (library, name), env)
+        else:
+            exec ("import %s as %s" % (library, name)) in env
     ENVIRONMENT.update(env)
     return List(*[make_symbol(name) for name in env.keys() if not name.startswith("_")])
 
 def import_from_native(library, name_list, environment):
     env = {}
-    exec ("from %s import %s" % (library, ", ".join([str(name) for name in name_list]))) in env
+    if PY3:
+        exec("from %s import %s" % (library, ", ".join([str(name) for name in name_list])), env)
+    else:
+        exec ("from %s import %s" % (library, ", ".join([str(name) for name in name_list]))) in env
     ENVIRONMENT.update(env)
     return List(*[make_symbol(name) for name in env.keys() if not name.startswith("_")])
 
