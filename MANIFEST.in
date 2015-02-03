@@ -1,6 +1,6 @@
 include *.txt
 include *.rst
-recursive-include images *.png
+include calysto/images/*.png
 recursive-include docs *.rst
 recursive-include docs *.png
 recursive-include docs *.py
