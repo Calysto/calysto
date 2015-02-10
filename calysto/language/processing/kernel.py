@@ -9,16 +9,15 @@ class ProcessingKernel(MetaKernel):
     language = 'java'
     language_version = '0.1'
     language_info = {
-        'mimetype': 'text/x-processing',
+        'mimetype': 'text/x-java',
         'name': 'java',
-        # ------ If different from 'language':
-        # 'codemirror_mode': {
-        #    "version": 2,
-        #    "name": "ipython"
-        # }
+        'codemirror_mode': {
+            "version": 2,
+            "name": "text/x-java"
+        },
         # 'pygments_lexer': 'language',
         # 'version'       : "x.y.z",
-        'file_extension': '.pjs',
+        'file_extension': '.java',
     }
     banner = "Processing kernel - evaluates Processing programs"
     canvas_id = 0
