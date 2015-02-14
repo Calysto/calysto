@@ -5,6 +5,7 @@ Because Calysto Processing uses [MetaKernel](https://github.com/Calysto/metakern
 Calysto Processing in use:
 
 * [CS110: Introduction to Computing](http://jupyter.cs.brynmawr.edu/hub/dblank/public/CS110%20Intro%20to%20Computing/2015/Syllabus.ipynb)
+* [Video](https://www.youtube.com/watch?v=V4TzARh-ClY)
 
 You can install Calysto Processing with:
 
