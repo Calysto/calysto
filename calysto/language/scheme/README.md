@@ -1,5 +1,7 @@
 Calysto Scheme is a real Scheme programming language, with full support for continuations, including call/cc. It can also use all Python libraries. Also has some extensions that make it more useful (stepper-debugger, choose/fail), or make it better integrated with Python.
 
+Because Calysto Scheme uses [MetaKernel](https://github.com/Calysto/metakernel/blob/master/README.rst), it has a fully-supported set of "magics"---meta-commands for additional functionality. This includes running Scheme in parallel. See all of the [MetaKernel Magics](https://github.com/Calysto/metakernel/blob/master/metakernel/magics/README.md).
+
 Scheme in use:
 
 * [CS245: Programming Languages](http://jupyter.cs.brynmawr.edu/hub/dblank/public/CS245%20Programming%20Languages/2014/Programming%20Languages,%20Syllabus.ipynb)
