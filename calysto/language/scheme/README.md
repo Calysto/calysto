@@ -5,6 +5,7 @@ Because **Calysto Scheme** uses [MetaKernel](https://github.com/Calysto/metakern
 **Calysto Scheme** in use:
 
 * [CS245: Programming Languages](http://jupyter.cs.brynmawr.edu/hub/dblank/public/CS245%20Programming%20Languages/2014/Programming%20Languages,%20Syllabus.ipynb)
+* Videos: https://www.youtube.com/watch?v=2w-iO701g_w
 
 You can install Calysto Scheme with Python3:
 
