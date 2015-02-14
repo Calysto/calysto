@@ -1,4 +1,6 @@
-Calysto Processing is the merging of ProcessingJS with Jupyter (aka IPython).
+**Calysto Processing** is the merging of [ProcessingJS](http://processingjs.org/) with [Project Jupyter](http://jupyter.org/) (aka IPython). Processing Sketches are entered into Jupyter notebook cells, and even run in rendered notebooks. Sketches can be paused, and stepped one draw() at a time. 
+
+Because Calysto Processing uses [MetaKernel](https://github.com/Calysto/metakernel/blob/master/README.rst), it has a fully-supported set of "magics"---meta-commands for additional functionality. A list of magics can be seen at [MetaKernel Magics](https://github.com/Calysto/metakernel/blob/master/metakernel/magics/README.md).
 
 Calysto Processing in use:
 
