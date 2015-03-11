@@ -127,10 +127,10 @@ class ProcessingKernel(MetaKernel):
         return "This is the Processing kernel based on Processingjs.org."
 
     def do_execute_direct(self, code):
+        """%%processing - run contents of cell as a Processing script"""
         if code.strip() == "":
             return
         self.canvas_id += 1
-        """%%processing - run contents of cell as a Processing script"""
 
         env = {"code": repr(code)[1:] if sys.version.startswith('2') else repr(code),
                "id": self.canvas_id}
