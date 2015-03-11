@@ -1,37 +1,41 @@
-**Calysto Processing** is the merging of [ProcessingJS](http://processingjs.org/) with [Project Jupyter](http://jupyter.org/) (aka IPython). Processing Sketches are entered into Jupyter notebook cells, and even run in rendered notebooks. Sketches can be paused, and stepped one draw() at a time. 
+**Skulpt Python Kernel** is the merging of [Skulpt](http://www.skulpt.org/) (a Python implementation that runs in the browser) with [Project Jupyter](http://jupyter.org/) (aka IPython). In addtion, it has an interface to [ProcessingJS](http://processingjs.org/). Skulpt scripts are entered into a cell, where they run independently from other cells. 
 
-Because Calysto Processing uses [MetaKernel](https://github.com/Calysto/metakernel/blob/master/README.rst), it has a fully-supported set of "magics"---meta-commands for additional functionality. A list of magics can be seen at [MetaKernel Magics](https://github.com/Calysto/metakernel/blob/master/metakernel/magics/README.md).
+Because Skulpt Kernel uses [MetaKernel](https://github.com/Calysto/metakernel/blob/master/README.rst), it has a fully-supported set of "magics"---meta-commands for additional functionality. A list of magics can be seen at [MetaKernel Magics](https://github.com/Calysto/metakernel/blob/master/metakernel/magics/README.md).
 
-Calysto Processing in use:
+Skulpt Kernel in use:
 
-* [CS110: Introduction to Computing](http://jupyter.cs.brynmawr.edu/hub/dblank/public/CS110%20Intro%20to%20Computing/2015/Syllabus.ipynb)
-* [Video](https://www.youtube.com/watch?v=V4TzARh-ClY)
+* [Video](https://www.youtube.com/watch?v=iSGXOU5C3sQ)
+* [Example notebook from video](http://jupyter.cs.brynmawr.edu/hub/dblank/public/Examples/Skulpt%20Python%20Examples.ipynb)
 
-You can install Calysto Processing with:
+You can install Skulpt Kernel with:
 
 ```
-pip install --update calysto-processing
+pip install --update skulpt-kernel
 ```
 
 or in the system kernels with:
 
 ```
-sudo pip install --update calysto-processing
+sudo pip install --update skulpt-kernel
 ```
 
 Use it in the notebook with:
 
 ```
-ipython notebook --kernel calysto_processing
+ipython notebook
 ```
+
+and select `Skulpt Python` as the kernel for a new notebook.
 
 Requires:
 
 * ipython-3.0
 * Python2 or Python3
-* metakernel (installed automatically)
+* metakernel (installed with pip)
+* calysto (installed with pip)
 
-Calysto Processing supports:
+Skulpt Kernel supports:
 
 * MetaKernel Magics
-* All of ProcessingJS, plus pause/restart and stepper
+* processing
+* turtle
