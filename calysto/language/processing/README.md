@@ -22,14 +22,17 @@ sudo pip install --update calysto-processing
 Use it in the notebook with:
 
 ```
-ipython notebook --kernel calysto_processing
+ipython notebook
 ```
+
+and then select `Calysto Processing` for a new notebook.
 
 Requires:
 
 * ipython-3.0
 * Python2 or Python3
-* metakernel (installed automatically)
+* metakernel (installed with pip)
+* calysto (installed with pip)
 
 Calysto Processing supports:
 
