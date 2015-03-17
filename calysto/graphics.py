@@ -168,6 +168,15 @@ class Shape(object):
     def rotate(self, degrees): 
         self.direction -= (math.pi / 180.0) * degrees
 
+    def fill(self, color): 
+        self.extra["fill"] = color
+
+    def stroke(self, color): 
+        self.extra["stroke"] = color
+
+    def stroke_width(self, width): 
+        self.extra["stroke_width"] = width
+
 class Circle(Shape):
     def __init__(self, center=(0,0), radius=1, **extra):
         super(Circle, self).__init__(center)
