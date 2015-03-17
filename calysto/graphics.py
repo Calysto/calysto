@@ -131,7 +131,10 @@ class Color(object):
 
 class Shape(object):
     def __init__(self, center=(0,0), **extra):
-        self.center = center # use directly, no copy
+        if isinstance(center, tuple):
+            self.center = list(center)
+        else:
+            self.center = center # use directly, no copy
         if "fill" not in extra:
             extra["fill"] = "purple"
         if "stroke" not in extra:
@@ -210,8 +213,14 @@ class Line(Shape):
             extra["stroke"] = "black"
         if "stroke_width" not in extra:
             extra["stroke_width"] = 1
-        self.start = start # use directly, no copy
-        self.end = end # use directly, no copy
+        if isinstance(start, tuple):
+            self.start = list(start)
+        else:
+            self.start = start # use directly, no copy
+        if isinstance(end, tuple):
+            self.end = list(end)
+        else:
+            self.end = end # use directly, no copy
         self.extra = extra
 
     def __repr__(self):
@@ -236,7 +245,10 @@ class Text(Shape):
     def __init__(self, text="", start=(0,0), **extra):
         super(Text, self).__init__()
         self.text = text
-        self.start = start # use directly, no copy
+        if isinstance(start, tuple):
+            self.start = list(start)
+        else:
+            self.start = start # use directly, no copy
         self.extra = extra
 
     def __repr__(self):
@@ -262,8 +274,14 @@ class Rectangle(Shape):
             extra["stroke"] = "black"
         if "stroke_width" not in extra:
             extra["stroke_width"] = 1
-        self.start = start # use directly, no copy
-        self.size = size # use directly, no copy
+        if isinstance(start, tuple):
+            self.start = list(start)
+        else:
+            self.start = start # use directly, no copy
+        if isinstance(size, tuple):
+            self.size = list(size)
+        else:
+            self.size = size # use directly, no copy
         self.rx = rx
         self.ry = ry
         self.extra = extra
@@ -291,7 +309,10 @@ class Ellipse(Shape):
             extra["stroke"] = "black"
         if "stroke_width" not in extra:
             extra["stroke_width"] = 1
-        self.radii = radii
+        if isinstance(radii, tuple):
+            self.radii = list(radii)
+        else:
+            self.radii = radii
         self.extra = extra
 
     def __repr__(self):
@@ -311,7 +332,7 @@ class Ellipse(Shape):
 class Polyline(Shape):
     def __init__(self, points=[], **extra):
         super(Polyline, self).__init__()
-        self.points = points # not a copy
+        self.points = points # not a copy FIXME
         self.extra = extra
 
     def __repr__(self):
@@ -341,7 +362,7 @@ class Polygon(Shape):
             extra["stroke"] = "black"
         if "stroke_width" not in extra:
             extra["stroke_width"] = 1
-        self.points = points # not a copy
+        self.points = points # not a copy FIXME
         self.extra = extra
 
     def __repr__(self):
