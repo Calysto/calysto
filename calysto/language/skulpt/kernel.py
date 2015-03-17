@@ -35,13 +35,26 @@ class SkulptPythonKernel(MetaKernel):
         env = {"code": repr(code)[1:] if sys.version.startswith('2') else repr(code),
                "id": self.canvas_id}
         code = """
-<div id="canvas_div_%(id)s">
-  <b>Canvas #%(id)s:</b><br/>
-  <pre id="output_%(id)s" ></pre> 
-  <canvas id="canvas_%(id)s"></canvas><br/>
+<div id='canvas_div_%(id)s'>
+      <b>Canvas #%(id)s:</b><br/>
+      <pre id='output_%(id)s' ></pre>
+      <canvas id='canvas_%(id)s'></canvas><br/>
 </div>
 <script>
+/*
+var component = document.getElementById("output_%(id)s");
+if (component != undefined)
+    component.remove();
+component = document.getElementById("canvas_div_%(id)s");
+if (component != undefined)
+    component.remove();
 
+$("<div id='canvas_div_%(id)s'> \
+      <b>Canvas #%(id)s:</b><br/>  \
+      <pre id='output_%(id)s' ></pre> \
+      <canvas id='canvas_%(id)s'></canvas><br/> \
+   </div>").appendTo('body');    
+*/
 require(["http://cs.brynmawr.edu/~dblank/skulpt/skulpt.min.js",
          "http://cs.brynmawr.edu/~dblank/processing/processing.js"], function () {
   require(["http://cs.brynmawr.edu/~dblank/skulpt/skulpt-stdlib.js"], function () {
