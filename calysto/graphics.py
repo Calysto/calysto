@@ -131,7 +131,7 @@ class Color(object):
 
 class Shape(object):
     def __init__(self, center=(0,0), **extra):
-        self.center = list(center)
+        self.center = center # use directly, no copy
         if "fill" not in extra:
             extra["fill"] = "purple"
         if "stroke" not in extra:
@@ -193,7 +193,7 @@ class Circle(Shape):
         return "<Circle %s, r=%s>" % (self.center, self.radius)
 
     def moveTo(self, center):
-        self.center = list(center)
+        self.center = center # use directly, no copy
         return self.canvas
 
     def move(self, delta):
@@ -210,8 +210,8 @@ class Line(Shape):
             extra["stroke"] = "black"
         if "stroke_width" not in extra:
             extra["stroke_width"] = 1
-        self.start = list(start)
-        self.end = list(end)
+        self.start = start # use directly, no copy
+        self.end = end # use directly, no copy
         self.extra = extra
 
     def __repr__(self):
@@ -236,7 +236,7 @@ class Text(Shape):
     def __init__(self, text="", start=(0,0), **extra):
         super(Text, self).__init__()
         self.text = text
-        self.start = list(start)
+        self.start = start # use directly, no copy
         self.extra = extra
 
     def __repr__(self):
@@ -262,8 +262,8 @@ class Rectangle(Shape):
             extra["stroke"] = "black"
         if "stroke_width" not in extra:
             extra["stroke_width"] = 1
-        self.start = list(start)
-        self.size = list(size)
+        self.start = start # use directly, no copy
+        self.size = size # use directly, no copy
         self.rx = rx
         self.ry = ry
         self.extra = extra
@@ -298,7 +298,7 @@ class Ellipse(Shape):
         return "<Ellipse %s>" % str(self.radii)
 
     def moveTo(self, center):
-        self.center = list(center)
+        self.center = center # use directly, no copy
         return self.canvas
 
     def move(self, delta):
