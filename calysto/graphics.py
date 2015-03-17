@@ -193,11 +193,11 @@ class Circle(Shape):
         return "<Circle %s, r=%s>" % (self.center, self.radius)
 
     def moveTo(self, center):
-        self.center = center # use directly, no copy
+        self.center[:] = center # use directly, no copy
         return self.canvas
 
     def move(self, delta):
-        self.center = [self.center[0] + delta[0], self.center[1] + delta[1]]
+        self.center[:] = [self.center[0] + delta[0], self.center[1] + delta[1]]
         return self.canvas
 
     def _add(self, drawing):
@@ -220,13 +220,13 @@ class Line(Shape):
     def moveTo(self, start):
         diff_x = start[0] - self.start[0]
         diff_y = start[1] - self.start[1]
-        self.start = start
-        self.end = self.end[0] + diff_x, self.end[1] + diff_y
+        self.start[:] = start
+        self.end[:] = self.end[0] + diff_x, self.end[1] + diff_y
         return self.canvas
 
     def move(self, delta):
-        self.start = self.start[0] + delta[0], self.start[1] + delta[1]
-        self.end = self.end[0] + delta[0], self.end[1] + delta[1]
+        self.start[:] = self.start[0] + delta[0], self.start[1] + delta[1]
+        self.end[:] = self.end[0] + delta[0], self.end[1] + delta[1]
         return self.canvas
 
     def _add(self, drawing):
@@ -243,11 +243,11 @@ class Text(Shape):
         return "<Text %s>" % self.start
 
     def moveTo(self, start):
-        self.start = start
+        self.start[:] = start
         return self.canvas
 
     def move(self, delta):
-        self.start = self.start[0] + delta[0], self.start[1] + delta[1]
+        self.start[:] = self.start[0] + delta[0], self.start[1] + delta[1]
         return self.canvas
 
     def _add(self, drawing):
@@ -272,11 +272,11 @@ class Rectangle(Shape):
         return "<Rectangle %s,%s>" % (self.start, self.size)
 
     def moveTo(self, start):
-        self.start = start
+        self.start[:] = start
         return self.canvas
 
     def move(self, delta):
-        self.start = self.start[0] + delta[0], self.start[1] + delta[1]
+        self.start[:] = self.start[0] + delta[0], self.start[1] + delta[1]
         return self.canvas
 
     def _add(self, drawing):
@@ -298,11 +298,11 @@ class Ellipse(Shape):
         return "<Ellipse %s>" % str(self.radii)
 
     def moveTo(self, center):
-        self.center = center # use directly, no copy
+        self.center[:] = center # use directly, no copy
         return self.canvas
 
     def move(self, delta):
-        self.center = [self.center[0] + delta[0], self.center[1] + delta[1]]
+        self.center[:] = [self.center[0] + delta[0], self.center[1] + delta[1]]
         return self.canvas
 
     def _add(self, drawing):
@@ -311,7 +311,7 @@ class Ellipse(Shape):
 class Polyline(Shape):
     def __init__(self, points=[], **extra):
         super(Polyline, self).__init__()
-        self.points = points[:]
+        self.points = points # not a copy
         self.extra = extra
 
     def __repr__(self):
@@ -341,7 +341,7 @@ class Polygon(Shape):
             extra["stroke"] = "black"
         if "stroke_width" not in extra:
             extra["stroke_width"] = 1
-        self.points = points[:]
+        self.points = points # not a copy
         self.extra = extra
 
     def __repr__(self):
@@ -374,11 +374,11 @@ class Picture(Shape):
         return "<Picture %s,%s>" % (self.start, self.size)
 
     def moveTo(self, start):
-        self.start = start
+        self.start[:] = start
         return self.canvas
 
     def move(self, delta):
-        self.start = self.start[0] + delta[0], self.start[1] + delta[1]
+        self.start[:] = self.start[0] + delta[0], self.start[1] + delta[1]
         return self.canvas
 
     def _add(self, drawing):
