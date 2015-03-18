@@ -11,3 +11,7 @@ $ pip install calysto
 $ pip3 install calysto
 ```
 
+You may also need to install:
+
+* libXrender
+* libfontconfig
