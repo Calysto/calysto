@@ -10,13 +10,13 @@ Because **Calysto Scheme** uses [MetaKernel](https://github.com/Calysto/metakern
 You can install Calysto Scheme with Python3:
 
 ```
-pip3 install --update calysto-scheme
+pip3 install --upgrade calysto-scheme
 ```
 
 or in the system kernel folder with:
 
 ```
-sudo pip3 install --update calysto-scheme
+sudo pip3 install --upgrade calysto-scheme
 ```
 
 Use it in the console, qtconsole, or notebook with IPython 3:
