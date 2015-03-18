@@ -10,13 +10,13 @@ Calysto Processing in use:
 You can install Calysto Processing with:
 
 ```
-pip install --update calysto-processing
+pip install --upgrade calysto-processing
 ```
 
 or in the system kernels with:
 
 ```
-sudo pip install --update calysto-processing
+sudo pip install --upgrade calysto-processing
 ```
 
 Use it in the notebook with:
@@ -26,6 +26,41 @@ ipython notebook
 ```
 
 and then select `Calysto Processing` for a new notebook.
+
+Calysto Processing also has an enhancement: Tables, and some related functions:
+
+```java
+import processing.table.*;
+
+Table table;
+
+void setup() {
+    table = loadTable("test.csv", "header");
+    println(table.getRowCount() + " total rows in table"); 
+}
+
+long findMax() {
+    int retval = 0;
+    for (TableRow row : table.rows()) {
+        pop = row.getInt("Population");
+        if (pop > retval)
+            retval = pop;
+    }
+    return retval;
+}
+```
+
+Table-related classes and methods:
+
+* loadTable(CSV_FILNAME, "header");
+* Table class
+* TableRow class
+* table.rows() - returns iterator for use with for(TableRow row : table.rows()) {...}
+* row.getInt(COLUMN_NAME)
+* row.getString(COLUMN_NAME)
+* row.getFloat(COLUMN_NAME)
+
+See source for more details.
 
 Requires:
 

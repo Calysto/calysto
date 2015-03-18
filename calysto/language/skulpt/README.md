@@ -10,13 +10,13 @@ Skulpt Kernel in use:
 You can install Skulpt Kernel with:
 
 ```
-pip install --update skulpt-kernel
+pip install --upgrade skulpt-kernel
 ```
 
 or in the system kernels with:
 
 ```
-sudo pip install --update skulpt-kernel
+sudo pip install --upgrade skulpt-kernel
 ```
 
 Use it in the notebook with:
