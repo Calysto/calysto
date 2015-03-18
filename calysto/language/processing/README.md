@@ -10,13 +10,13 @@ Calysto Processing in use:
 You can install Calysto Processing with:
 
 ```
-pip install --update calysto-processing
+pip install --upgrade calysto-processing
 ```
 
 or in the system kernels with:
 
 ```
-sudo pip install --update calysto-processing
+sudo pip install --upgrade calysto-processing
 ```
 
 Use it in the notebook with:
