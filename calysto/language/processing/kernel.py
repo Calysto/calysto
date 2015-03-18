@@ -252,7 +252,7 @@ function switchSketchState(id, on) {
     }
 }
 
-require(["http://cs.brynmawr.edu/~dblank/processing/processing.js"], function () {
+require(["https://calysto.github.io/javascripts/processing/processing.js"], function () {
     var processingCode = %(code)s;
     var cc;
     var processingInstance;
@@ -334,7 +334,7 @@ require(["http://cs.brynmawr.edu/~dblank/processing/processing.js"], function ()
         component = document.getElementById("controls_div_%(id)s");
         if (component != undefined)
             component.remove();
-        require(["http://cs.brynmawr.edu/~dblank/processing/processing.js"], function() {
+        require(["https://calysto.github.io/javascripts/processing/processing.js"], function() {
             // FIXME: Stop all previously running versions (?)
             var processingInstance = Processing.getInstanceById("canvas_%(id)s");
             if (processingInstance != undefined && processingInstance.isRunning())
