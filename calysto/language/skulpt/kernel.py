@@ -55,9 +55,9 @@ $("<div id='canvas_div_%(id)s'> \
       <canvas id='canvas_%(id)s'></canvas><br/> \
    </div>").appendTo('body');    
 */
-require(["https://calysto.github.io/javascripts/skulpt/skulpt.min.js",
-         "https://calysto.github.io/javascripts/processing/processing.js"], function () {
-  require(["https://calysto.github.io/javascripts/skulpt/skulpt-stdlib.js"], function () {
+require([window.location.protocol + "//calysto.github.io/javascripts/skulpt/skulpt.min.js",
+         window.location.protocol + "//calysto.github.io/javascripts/processing/processing.js"], function () {
+  require([window.location.protocol + "//calysto.github.io/javascripts/skulpt/skulpt-stdlib.js"], function () {
     function outf_%(id)s(text) {
         var mypre = document.getElementById("output_%(id)s"); 
         mypre.innerHTML = mypre.innerHTML + text; 
