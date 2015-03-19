@@ -40,7 +40,7 @@ if svem_flag in sys.argv:
     sys.argv.remove(svem_flag)
 
 setup(name='skulpt_python',
-      version='0.8.1',
+      version='0.9.0',
       description='A Python kernel in the browser for Jupyter/IPython',
       long_description="A Python kernel in the browser for Jupyter/IPython, based on MetaKernel and Skulpt",
       url="https://github.com/Calysto/calysto/language/skulpt",
