@@ -85,7 +85,6 @@ require([window.location.protocol + "//calysto.github.io/javascripts/skulpt/skul
         function(err) {
             alert(err.toString());
         });
-       }
     }
     runit(%(id)s);
   });
