@@ -75,10 +75,16 @@ require([window.location.protocol + "//calysto.github.io/javascripts/skulpt/skul
        Sk.canvas = "canvas_" + id;
        Sk.pre = "output_" + id;
        Sk.configure({output:outf_%(id)s, read:builtinRead, python3:false}); 
-       try {
-          eval(Sk.importMainWithBody("<stdin>",false,prog)); 
-       } catch(e) {
-          alert(e.toString());
+       var myPromise = Sk.misceval.asyncToPromise(function() {
+           return Sk.importMainWithBody("<stdin>", false, prog, true);
+       });
+       myPromise.then(
+        function(mod) {
+            console.log('success');
+        },
+        function(err) {
+            alert(err.toString());
+        });
        }
     }
     runit(%(id)s);
