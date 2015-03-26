@@ -38,7 +38,7 @@ class SkulptPythonKernel(MetaKernel):
 <div id='canvas_div_%(id)s'>
       <b>Canvas #%(id)s:</b><br/>
       <pre id='output_%(id)s' ></pre>
-      <canvas id='canvas_%(id)s'></canvas><br/>
+      <div id='canvas_%(id)s'></div><br/>
 </div>
 <script>
 /*
@@ -52,7 +52,7 @@ if (component != undefined)
 $("<div id='canvas_div_%(id)s'> \
       <b>Canvas #%(id)s:</b><br/>  \
       <pre id='output_%(id)s' ></pre> \
-      <canvas id='canvas_%(id)s'></canvas><br/> \
+      <div id='canvas_%(id)s'></div><br/> \
    </div>").appendTo('body');    
 */
 require([window.location.protocol + "//calysto.github.io/javascripts/skulpt/skulpt.min.js",
