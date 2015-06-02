@@ -1068,6 +1068,8 @@ class Network(object):
         weights = dict of {connectedLayerName: [weights], ...}
 
         Example:
+        >>> net = Network() # doctest: +ELLIPSIS
+        Conx using seed: ...
         >>> net.addLayers(2, 5, 1)
         >>> net.addLayerNode("hidden", bias = -0.12, weights = {"input": [1, 0], "output": [0]})
         """
@@ -1975,10 +1977,11 @@ class Network(object):
 
         Examples:
 
-        >>> net.propagate()
-        >>> net.propagate(input = [0, .5, 0], context = [.5, .5, .5])
-        {"output": [0.345]}
-        
+        >>> net = Network() # doctest: +ELLIPSIS
+        Conx using seed: ...
+        >>> net.addLayers(2, 5, 1)
+        >>> len(net.propagate(input = [0, .5]))
+        1
         """
         self.prePropagate(**args)
         for key in args:
@@ -2039,12 +2042,15 @@ class Network(object):
 
         Examples:
 
-        >>> net.propagateTo("output")
-        [0.34]
-        >>> net.propagateTo("hidden")
-        [0.12, 0.05, 0.61, 0.99]
-        >>> net.propagateTo("hidden", input = [0, .5, 0], context = [.5, .5, .5])
-        [0.54, 0.98, 0.57, 0.34]
+        >>> net = Network() # doctest: +ELLIPSIS
+        Conx using seed: ...
+        >>> net.addLayers(2, 5, 1)
+        >>> len(net.propagateTo("output"))
+        1
+        >>> len(net.propagateTo("hidden"))
+        5
+        >>> len(net.propagateTo("hidden", input = [0, 0]))
+        5
         """
         for layerName in args:
             self[layerName].activationSet = 0 # force it to be ok
@@ -2069,10 +2075,11 @@ class Network(object):
 
         Examples:
 
-        >>> net.propagate()
-        >>> net.propagate(input = [0, .5, 0], context = [.5, .5, .5])
-        {"output": [0.345]}
-        
+        >>> net = Network() # doctest: +ELLIPSIS
+        Conx using seed: ...
+        >>> net.addLayers(2, 5, 1)
+        >>> len(net.propagate(input = [1, .5]))
+        1
         """
         for layerName in args:
             self[layerName].copyActivations(args[layerName])
