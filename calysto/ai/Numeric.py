@@ -5,6 +5,7 @@
 import math, operator, copy
 import array as python_array
 import random
+from functools import reduce
 
 #class python_array(parray.array):
 #    def __new__(cls, *args, **kwargs):
@@ -17,7 +18,7 @@ def ndim(n, *args, **kwargs):
     """
     thunk = kwargs.get("thunk", lambda: random.random())
     if not args: 
-        return [thunk() for i in xrange(n)]
+        return [thunk() for i in range(n)]
     A = [] 
     for i in range(n):
         A.append( ndim(*args, thunk=thunk) ) 
@@ -32,12 +33,12 @@ class array:
         ## array([[1, 2], [3, 4]])
         if type(data) == array:
             self.array = data[:]
-        elif type(data[0]) in [int, float, long, bool]:
+        elif type(data[0]) in [int, float, int, bool]:
             # array.array of floats
             self.array = python_array.array('d', data)
         else:
             # list of Arrays
-            self.array = map(array, data)
+            self.array = list(map(array, data))
 
     def __getitem__(self, item):
         return self.array[item]
@@ -56,63 +57,63 @@ class array:
 
     def __repr__(self):
         if type(self.array) is list:
-            return str(map(lambda v: str(v), self.array))
+            return str([str(v) for v in self.array])
         else:
             return str(self.array.tolist())
 
     def __lt__(self, other):
         if type(self.array) is list:
-            return array(map(lambda v: v < other, self.array))
+            return array([v < other for v in self.array])
         return array([f < other for f in self.array])
 
     def __gt__(self, other):
         if type(self.array) is list:
-            return array(map(lambda v: v > other, self.array))
+            return array([v > other for v in self.array])
         return array([f > other for f in self.array])
 
     def __mul__(self, other):
-        if type(other) in [int, float, long]:
-            return array(map(lambda v: v * other, self.array))
+        if type(other) in [int, float, int]:
+            return array([v * other for v in self.array])
         else: # array * [0, 1] 
-            return array(map(lambda a,b: a * b, self.array, other))
+            return array(list(map(lambda a,b: a * b, self.array, other)))
 
     def __div__(self, other):
-        if type(other) in [int, float, long]:
-            return array(map(lambda v: v / other, self.array))
+        if type(other) in [int, float, int]:
+            return array([v / other for v in self.array])
         else:
             raise Exception("not implemented yet")
         #else: # array * [0, 1] 
         #    return array(map(lambda a,b: a / b, self.array, other))
 
     def __sub__(self, other):
-        if type(other) in [int, float, long]:
-            return array(map(lambda v: v - other, self.array))
+        if type(other) in [int, float, int]:
+            return array([v - other for v in self.array])
         else: # array - [0, 1]
             ##print("-", self.array, other)
-            return array(map(lambda a,b: a - b, self.array, other))
+            return array(list(map(lambda a,b: a - b, self.array, other)))
 
     def __rsub__(self, other):
-        if type(other) in [int, float, long]:
-            return array(map(lambda v: other - v, self.array))
+        if type(other) in [int, float, int]:
+            return array([other - v for v in self.array])
         else: # array - [0, 1]
-            return array(map(lambda a,b: b - a, self.array, other))
+            return array(list(map(lambda a,b: b - a, self.array, other)))
 
     def __add__(self, other):
-        if type(other) in [int, float, long]:
-            return array(map(lambda v: v + other, self.array))
+        if type(other) in [int, float, int]:
+            return array([v + other for v in self.array])
         else: # array + [0, 1]
             #print "add a", self.array
             #print "add b", other
-            return array(map(lambda a,b: a + b, self.array, other))
+            return array(list(map(lambda a,b: a + b, self.array, other)))
 
     def __pow__(self, other):
-        if type(other) in [int, float, long]:
-            return array(map(lambda v: v ** other, self.array))
+        if type(other) in [int, float, int]:
+            return array([v ** other for v in self.array])
         else: # array ** [0, 1]
-            return array(map(lambda a,b: a ** b, self.array, other))
+            return array(list(map(lambda a,b: a ** b, self.array, other)))
 
     def __abs__(self):
-        return array(map(lambda v: abs(v), self.array))
+        return array([abs(v) for v in self.array])
 
     def getShape(self):
         if type(self.array) == list:
@@ -132,13 +133,13 @@ argmin = lambda vector: vector.index(min(vector))
 
 def put(toArray, arange, fromArray):
     for i in arange:
-        if type(fromArray) in [int, float, long]:
+        if type(fromArray) in [int, float, int]:
             toArray[i] = fromArray
         else:
             toArray[i] = fromArray[i]
 
 def arange(size):
-    return range(size)
+    return list(range(size))
 
 def zeros(dims, typecode='f'):
     if type(dims) == type(1):
@@ -157,7 +158,7 @@ class add:
         Can be a vector or matrix. If data are bool, sum Trues.
         """
         if type(vector) is list: # matrix
-            return array(map(add.reduce, vector))
+            return array(list(map(add.reduce, vector)))
         else:
             return sum(vector) # Numeric_array, return scalar
 
@@ -168,7 +169,7 @@ class multiply:
         Can be a vector or matrix. If data are bool, sum Trues.
         """
         if type(vector) is list: # matrix
-            return array(map(multiply.reduce, vector))
+            return array(list(map(multiply.reduce, vector)))
         else:
             return reduce(operator.mul, vector) # Numeric.array, return scalar
 
@@ -197,7 +198,7 @@ def matrixmultiply(a, b):
     #print "x a:", a
     #print "x b:", b
     # a = [[0, 1], [2, 3], [4, 5]], b = [0, 1]
-    if type(b[0]) in [float, int, long]:
+    if type(b[0]) in [float, int, int]:
         retval = zeros(len(a))
         for i in range(len(a)):
             for j in range(len(a[0])):
@@ -233,7 +234,7 @@ def test():
         return int(correct)
 
     def testexpr(expr, solution, count):
-        print("Test %s: %s" % (count, expr))
+        print(("Test %s: %s" % (count, expr)))
         # Testing original Numeric versus this version
         # Define one, or both of these:
         #orig = expr.replace("Numeric.", "MyNumeric.")
@@ -243,13 +244,13 @@ def test():
         except:
             traceback.print_exc()
             a = "ERROR"
-        print("   Numeric:", a)
+        print(("   Numeric:", a))
         try:
             b = eval(repl)
         except:
             traceback.print_exc()
             b = "ERROR"
-        print("   Replace:", b)
+        print(("   Replace:", b))
         return compare(a, solution, expr), compare(b, solution, expr)
 
     for expr, result in [
@@ -298,8 +299,8 @@ def test():
         ]:
         count += 1
         o, r = testexpr(expr, result, count)
-        print("-" * 60)
-        print(count, o, r)
+        print(("-" * 60))
+        print((count, o, r))
         ocount += o
         rcount += r
-    print("%s expressions tested: %s originals passed; %s replacements passed" % (count, ocount, rcount))
+    print(("%s expressions tested: %s originals passed; %s replacements passed" % (count, ocount, rcount)))
