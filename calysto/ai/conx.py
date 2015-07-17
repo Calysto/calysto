@@ -2474,7 +2474,7 @@ class Network(object):
             output += layer.toString()
         return output
     def prompt(self):
-        s = eval(input("<q>uit, <g>o, or press Ok: "))
+        s = input("<q>uit, <g>o, or press Enter: ")
         if s is None or s == "q":
             sys.exit(1)
         elif s == 'g':
