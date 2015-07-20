@@ -262,16 +262,6 @@ class Layer:
         self.frozen = 0 # freezes weights (dbiases), if layer still active
         self._maxRandom = maxRandom
         self.initialize()
-        self.verify = 1
-        # layer report of stats:
-        self.pcorrect = 0
-        self.ptotal = 0
-        self.correct = 0
-        # misc:
-        self.minTarget = 0.0
-        self.maxTarget = 1.0
-        self.minActivation = 0.0
-        self.maxActivation = 1.0
         
     def initialize(self):
         """
@@ -289,6 +279,17 @@ class Layer:
         self.netinput = Numeric.zeros(self.size, 'f')
         self.targetSet = 0
         self.activationSet = 0
+        self.verify = 1
+        # layer report of stats:
+        self.pcorrect = 0
+        self.ptotal = 0
+        self.correct = 0
+        # misc:
+        self.minTarget = 0.0
+        self.maxTarget = 1.0
+        self.minActivation = 0.0
+        self.maxActivation = 1.0
+
     def randomize(self, force = 0):
         """
         Initialize node biases to random values in the range [-max, max].
