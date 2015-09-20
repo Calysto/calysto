@@ -10,14 +10,13 @@ if svem_flag in sys.argv:
     sys.argv.remove(svem_flag)
 
 setup(name='calysto',
-      version='0.9.3',
+      version='0.9.4',
       description='Libraries and Languages for Python and IPython',
       long_description="Libraries and Languages for IPython and Python",
       author='Douglas Blank',
       author_email='doug.blank@gmail.com',
       url="https://github.com/Calysto/calysto",
-      install_requires=['IPython', 'metakernel', 'svgwrite', 'Pillow',
-                        'cairosvg'],
+      install_requires=['IPython', 'metakernel', 'svgwrite', 'cairosvg'],
       packages=['calysto',
                 'calysto.util',
                 'calysto.widget',
