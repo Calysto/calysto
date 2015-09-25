@@ -5,6 +5,7 @@ __all__ = [
     # Shapes:
     'Shape', 'Line', 'Circle', 'Text', 'Rectangle', 
     'Ellipse', 'Polyline', 'Polygon', 'Picture',
+    'BarChart',
     # Pixel-based items:
     'Pixel', 'Color',
     # Units:
@@ -101,6 +102,9 @@ class Canvas(object):
             for y in range(height):
                 yield Pixel(array, x, y)
 
+    def sortByZ(self):
+        self.shapes.sort(key=lambda shape: shape.z)
+
 class Pixel(object):
     """
     Wrapper interface to numpy array.
@@ -129,6 +133,11 @@ class Color(object):
         self.blue = b
         self.alpha = a
 
+    def __str__(self):
+        def h(num):
+            return ("0x%02x" % num)[-2:]
+        return "#" + h(self.red) + h(self.green) + h(self.blue)
+
 class Shape(object):
     def __init__(self, center=(0,0), **extra):
         if isinstance(center, tuple):
@@ -145,6 +154,7 @@ class Shape(object):
         self.canvas = None
         self.direction = 0
         self.pen = False
+        self.z = 0
 
     def __repr__(self):
         return "<Shape %s>" % self.center
@@ -172,13 +182,38 @@ class Shape(object):
         self.direction -= (math.pi / 180.0) * degrees
 
     def fill(self, color): 
-        self.extra["fill"] = color
+        self.extra["fill"] = str(color)
+        if isinstance(color, Color):
+            self.extra["fill-opacity"] = color.aplha/255
+        elif "fill-opacity" in self.extra:
+            del self.extra["fill-opacity"] 
+
+    def noFill(self):
+        self.extra["fill-opacity"] = 0.0
+
+    def noStroke(self):
+        self.extra["stroke-opacity"] = 0.0
 
     def stroke(self, color): 
-        self.extra["stroke"] = color
+        self.extra["stroke"] = str(color)
+        if isinstance(color, Color):
+            self.extra["stroke-opacity"] = color.aplha/255
+        elif "stroke-opacity" in self.extra:
+            del self.extra["stroke-opacity"] 
 
     def stroke_width(self, width): 
         self.extra["stroke_width"] = width
+
+    def moveToTop(self):
+        self.canvas.shapes.remove(self)
+        self.canvas.shapes.append(self)
+        return self.canvas
+        
+    def moveToBottom(self):
+        self.canvas.shapes.remove(self)
+        self.canvas.shapes.insert(0, self)
+        return self.canvas
+        
 
 class Circle(Shape):
     def __init__(self, center=(0,0), radius=1, **extra):
@@ -404,6 +439,58 @@ class Picture(Shape):
 
     def _add(self, drawing):
         drawing.add(drawing.image(self.href, insert=self.start, size=self.size, **self.extra))
+
+class Plot(Canvas):
+    """
+    """
+    def __init__(self, *args, **kwargs):
+        super(Plot, self).__init__(*args, **kwargs)
+        ## Borders:
+        self.frame_size = 20
+        self.x_offset = 20
+        ## (upper left, width, height)
+        self.plot_boundaries = [self.frame_size + self.x_offset, 
+                                self.frame_size,
+                                self.size[0] - 2 * self.frame_size - self.x_offset, 
+                                self.size[1] - 2 * self.frame_size]
+        self.plot_width = self.plot_boundaries[2] - self.plot_boundaries[0]
+        self.plot_height = self.plot_boundaries[3] - self.plot_boundaries[1]
+        self.plot_origin = (self.plot_boundaries[0], self.size[1] - self.frame_size * 2)
+        self.background = Rectangle((self.plot_boundaries[0],
+                                     self.plot_boundaries[1]),
+                                    (self.plot_width, self.plot_height))
+        self.background.noFill()
+        self.background.stroke("#000000")
+        self.draw(self.background)
+
+class BarChart(Plot):
+    """
+    """
+    def __init__(self, *args, **kwargs):
+        super(BarChart, self).__init__(*args, **kwargs)
+        self.data = kwargs.get("data", [])
+        self.bar_width = self.plot_width / len(self.data)
+        max_count = max(self.data)
+        start_x = self.plot_origin[0] + self.bar_width * 0.125
+        start_y = self.plot_origin[1]
+        count = 0
+        for item in self.data:
+            self.draw( Rectangle((start_x + self.bar_width * count,
+                                  start_y - item/max_count * self.plot_height), 
+                                 (self.bar_width * 0.75, 
+                                  item/max_count * self.plot_height)))
+            count += 1
+        # X legend:
+        self.labels = kwargs.get("labels", [])
+        count = 0
+        for item in self.labels:
+            self.draw( Text(item, (start_x + self.bar_width * count + self.bar_width/3,
+                                   start_y + self.frame_size)))
+            count += 1
+        # Y legend:
+        for count in range(4 + 1):
+            self.draw( Text(str(max_count * count/4)[0:5],
+                            (0, 1.2 * self.frame_size + self.plot_height - count/4 * self.plot_height)))
 
 #g(**extra) # Group
 #symbol(**extra)
