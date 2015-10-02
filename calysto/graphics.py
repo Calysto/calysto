@@ -184,7 +184,7 @@ class Shape(object):
     def fill(self, color): 
         self.extra["fill"] = str(color)
         if isinstance(color, Color):
-            self.extra["fill-opacity"] = color.aplha/255
+            self.extra["fill-opacity"] = color.alpha/255
         elif "fill-opacity" in self.extra:
             del self.extra["fill-opacity"] 
 
@@ -197,7 +197,7 @@ class Shape(object):
     def stroke(self, color): 
         self.extra["stroke"] = str(color)
         if isinstance(color, Color):
-            self.extra["stroke-opacity"] = color.aplha/255
+            self.extra["stroke-opacity"] = color.alpha/255
         elif "stroke-opacity" in self.extra:
             del self.extra["stroke-opacity"] 
 
