@@ -4,7 +4,7 @@ __all__ = [
     'Canvas', 
     # Shapes:
     'Shape', 'Line', 'Circle', 'Text', 'Rectangle', 
-    'Ellipse', 'Polyline', 'Polygon', 'Picture',
+    'Ellipse', 'Polyline', 'Polygon', 'Picture', 'Arc',
     'BarChart',
     # Pixel-based items:
     'Pixel', 'Color',
@@ -17,7 +17,11 @@ from svgwrite import cm, em, ex, mm, pc, pt, px
 import cairosvg
 import numpy
 import math
+import copy
 from cairosvg.parser import Tree
+
+def rotate(x, y, length, radians):
+    return (x + length * math.cos(-radians), y - length * math.sin(-radians))
 
 class Canvas(object):
     def __init__(self, filename="noname.svg", size=(300, 300), **extras):
@@ -28,15 +32,56 @@ class Canvas(object):
         self.extras = extras
         self.shapes = []
         self._viewbox = None
+        self.matrix = []
+        self.fill_color = "purple"
+        self.stroke_color = "black"
+        self.stroke_width_width = 1
+        self.fill_opacity = None
+        self.stroke_opacity = None
 
     def __repr__(self):
         return "<Canvas %s>" % str(self.size)
 
     def _render(self):
-        canvas = svgwrite.Drawing(self.filename, self.size, **self.extras)
+        drawing = svgwrite.Drawing(self.filename, self.size, **self.extras)
         if self._viewbox:
-            canvas.viewbox(*self._viewbox)
-        return canvas
+            drawing.viewbox(*self._viewbox)
+        return drawing
+
+    def fill(self, color):
+        self.fill_color = color
+        if isinstance(color, Color):
+            self.fill_opacity = color.alpha/255
+        else:
+            self.fill_opacity = None
+
+    def noFill(self):
+        self.fill_opacity = 0.0
+
+    def stroke(self, color):
+        self.stroke_color = color
+        if isinstance(color, Color):
+            self.stroke_opacity = color.alpha/255
+        else:
+            self.stroke_opacity = None
+
+    def noStroke(self):
+        self.stroke_opacity = 0.0
+
+    def stroke_width(self, width):
+        self.stroke_width_width = width
+
+    def pushMatrix(self):
+        self.matrix.append([])
+
+    def translate(self, x, y):
+        self.matrix[-1].append(("translate", x, y))
+
+    def rotate(self, radians):
+        self.matrix[-1].append(("rotate", radians * 180/math.pi))
+
+    def popMatrix(self):
+        self.matrix.pop()
 
     def viewbox(self, xmin, ymin, width, height):
         self._viewbox = (xmin, ymin, width, height)
@@ -50,6 +95,19 @@ class Canvas(object):
 
     def draw(self, shape):
         shape.canvas = self
+        shape.matrix = copy.copy(self.matrix)
+        if "fill" not in shape.extras:
+            shape.extras["fill"] = self.fill_color
+        if "stroke" not in shape.extras:
+            shape.extras["stroke"] = self.stroke_color
+        if "stroke_width" not in shape.extras:
+            shape.extras["stroke_width"] = self.stroke_width_width
+        if "stroke-opacity" not in shape.extras:
+            if self.stroke_opacity is not None:
+                shape.extras["stroke-opacity"] = self.stroke_opacity
+        if "fill-opacity" not in shape.extras:
+            if self.fill_opacity is not None:
+                shape.extras["fill-opacity"] = self.fill_opacity
         self.shapes.append(shape)
         return self
 
@@ -127,10 +185,16 @@ class Pixel(object):
         return self.array[x, y]
 
 class Color(object):
-    def __init__(self, r, g, b, a=255):
+    def __init__(self, r, g=None, b=None, a=255):
         self.red = r
-        self.green = g
-        self.blue = b
+        if g is not None:
+            self.green = g
+        else:
+            self.green = r
+        if b is not None:
+            self.blue = b
+        else:
+            self.blue = r
         self.alpha = a
 
     def __str__(self):
@@ -139,18 +203,12 @@ class Color(object):
         return "#" + h(self.red) + h(self.green) + h(self.blue)
 
 class Shape(object):
-    def __init__(self, center=(0,0), **extra):
+    def __init__(self, center=(0,0), **extras):
         if isinstance(center, tuple):
             self.center = list(center)
         else:
             self.center = center # use directly, no copy
-        if "fill" not in extra:
-            extra["fill"] = "purple"
-        if "stroke" not in extra:
-            extra["stroke"] = "black"
-        if "stroke_width" not in extra:
-            extra["stroke_width"] = 1
-        self.extra = extra
+        self.extras = extras
         self.canvas = None
         self.direction = 0
         self.pen = False
@@ -166,6 +224,19 @@ class Shape(object):
     def _add(self, drawing):
         pass
 
+    def _apply_matrices(self, shape, matrices):
+        for matrix in matrices:
+            for transform in matrix:
+                self._apply_transform(shape, *transform)
+
+    def _apply_transform(self, shape, transform, *args):
+        if transform == "rotate":
+            shape.rotate(*args)
+        elif transform == "translate":
+            shape.translate(*args)
+        else:
+            raise Exception("invalid transform: " + transform)
+
     def undraw(self, canvas):
         canvas.undraw(self)
         return canvas
@@ -175,34 +246,34 @@ class Shape(object):
         self.center[0] += distance * math.cos(self.direction)
         self.center[1] += distance * math.sin(self.direction)
         if self.pen and self.canvas:
-            Line(start, self.center, **self.extra).draw(self.canvas)
+            Line(start, self.center, **self.extras).draw(self.canvas)
             return self.canvas
 
     def rotate(self, degrees): 
         self.direction -= (math.pi / 180.0) * degrees
 
     def fill(self, color): 
-        self.extra["fill"] = str(color)
+        self.extras["fill"] = str(color)
         if isinstance(color, Color):
-            self.extra["fill-opacity"] = color.alpha/255
-        elif "fill-opacity" in self.extra:
-            del self.extra["fill-opacity"] 
+            self.extras["fill-opacity"] = color.alpha/255
+        elif "fill-opacity" in self.extras:
+            del self.extras["fill-opacity"] 
 
     def noFill(self):
-        self.extra["fill-opacity"] = 0.0
+        self.extras["fill-opacity"] = 0.0
 
     def noStroke(self):
-        self.extra["stroke-opacity"] = 0.0
+        self.extras["stroke-opacity"] = 0.0
 
     def stroke(self, color): 
-        self.extra["stroke"] = str(color)
+        self.extras["stroke"] = str(color)
         if isinstance(color, Color):
-            self.extra["stroke-opacity"] = color.alpha/255
-        elif "stroke-opacity" in self.extra:
-            del self.extra["stroke-opacity"] 
+            self.extras["stroke-opacity"] = color.alpha/255
+        elif "stroke-opacity" in self.extras:
+            del self.extras["stroke-opacity"] 
 
     def stroke_width(self, width): 
-        self.extra["stroke_width"] = width
+        self.extras["stroke_width"] = width
 
     def moveToTop(self):
         self.canvas.shapes.remove(self)
@@ -214,18 +285,11 @@ class Shape(object):
         self.canvas.shapes.insert(0, self)
         return self.canvas
         
-
 class Circle(Shape):
-    def __init__(self, center=(0,0), radius=1, **extra):
+    def __init__(self, center=(0,0), radius=1, **extras):
         super(Circle, self).__init__(center)
-        if "fill" not in extra:
-            extra["fill"] = "purple"
-        if "stroke" not in extra:
-            extra["stroke"] = "black"
-        if "stroke_width" not in extra:
-            extra["stroke_width"] = 1
         self.radius = radius
-        self.extra = extra
+        self.extras = extras
 
     def __repr__(self):
         return "<Circle %s, r=%s>" % (self.center, self.radius)
@@ -239,15 +303,53 @@ class Circle(Shape):
         return self.canvas
 
     def _add(self, drawing):
-        drawing.add(drawing.circle(center=self.center, r=self.radius, **self.extra))
+        shape = drawing.circle(center=self.center, r=self.radius, **self.extras)
+        self._apply_matrices(shape, self.matrix)
+        drawing.add(shape)
+
+class Arc(Shape):
+    def __init__(self, center=(0,0), radius=1, start=0, stop=0, **extras):
+        super(Arc, self).__init__(center)
+        self.radius = radius
+        self.start = start
+        self.stop = stop
+        self.extras = extras
+
+    def __repr__(self):
+        return "<Arc %s, r=%s>" % (self.center, self.radius)
+
+    def moveTo(self, center):
+        self.center[:] = center # use directly, no copy
+        return self.canvas
+
+    def move(self, delta):
+        self.center[:] = [self.center[0] + delta[0], self.center[1] + delta[1]]
+        return self.canvas
+
+    def _add(self, drawing):
+        current = self.start
+        points = [(self.center[0], self.center[1])]
+        while current < self.stop:
+            points.append(rotate(self.center[0], self.center[1], self.radius, current))
+            current += math.pi/180
+        extras = copy.copy(self.extras)
+        extras["stroke-opacity"] = 0.0
+        shape = drawing.polygon(points=points, **extras)
+        self._apply_matrices(shape, self.matrix)
+        drawing.add(shape)
+        extras = copy.copy(self.extras)
+        extras["fill-opacity"] = 0.0
+        shape = drawing.polyline(points=points[1:], **extras)
+        self._apply_matrices(shape, self.matrix)
+        drawing.add(shape)
 
 class Line(Shape):
-    def __init__(self, start=(0,0), end=(0,0), **extra):
+    def __init__(self, start=(0,0), end=(0,0), **extras):
         super(Line, self).__init__()
-        if "stroke" not in extra:
-            extra["stroke"] = "black"
-        if "stroke_width" not in extra:
-            extra["stroke_width"] = 1
+        if "stroke" not in extras:
+            extras["stroke"] = "black"
+        if "stroke_width" not in extras:
+            extras["stroke_width"] = 1
         if isinstance(start, tuple):
             self.start = list(start)
         else:
@@ -256,7 +358,7 @@ class Line(Shape):
             self.end = list(end)
         else:
             self.end = end # use directly, no copy
-        self.extra = extra
+        self.extras = extras
 
     def __repr__(self):
         return "<Line %s, %s>" % (self.start, self.end)
@@ -274,17 +376,19 @@ class Line(Shape):
         return self.canvas
 
     def _add(self, drawing):
-        drawing.add(drawing.line(start=self.start, end=self.end, **self.extra))
+        shape = drawing.line(start=self.start, end=self.end, **self.extras)
+        self._apply_matrices(shape, self.matrix)
+        drawing.add(shape)
 
 class Text(Shape):
-    def __init__(self, text="", start=(0,0), **extra):
+    def __init__(self, text="", start=(0,0), **extras):
         super(Text, self).__init__()
         self.text = text
         if isinstance(start, tuple):
             self.start = list(start)
         else:
             self.start = start # use directly, no copy
-        self.extra = extra
+        self.extras = extras
 
     def __repr__(self):
         return "<Text %s>" % self.start
@@ -298,17 +402,13 @@ class Text(Shape):
         return self.canvas
 
     def _add(self, drawing):
-        drawing.add(drawing.text(text=self.text, insert=self.start, **self.extra))
+        shape = drawing.text(text=self.text, insert=self.start, **self.extras)
+        self._apply_matrices(shape, self.matrix)
+        drawing.add(shape)
 
 class Rectangle(Shape):
-    def __init__(self, start=(0,0), size=(1,1), rx=None, ry=None, **extra):
+    def __init__(self, start=(0,0), size=(1,1), rx=None, ry=None, **extras):
         super(Rectangle, self).__init__()
-        if "fill" not in extra:
-            extra["fill"] = "purple"
-        if "stroke" not in extra:
-            extra["stroke"] = "black"
-        if "stroke_width" not in extra:
-            extra["stroke_width"] = 1
         if isinstance(start, tuple):
             self.start = list(start)
         else:
@@ -319,7 +419,7 @@ class Rectangle(Shape):
             self.size = size # use directly, no copy
         self.rx = rx
         self.ry = ry
-        self.extra = extra
+        self.extras = extras
 
     def __repr__(self):
         return "<Rectangle %s,%s>" % (self.start, self.size)
@@ -333,22 +433,18 @@ class Rectangle(Shape):
         return self.canvas
 
     def _add(self, drawing):
-        drawing.add(drawing.rect(insert=self.start, size=self.size, rx=self.rx, ry=self.ry, **self.extra))
+        shape = drawing.rect(insert=self.start, size=self.size, rx=self.rx, ry=self.ry, **self.extras)
+        self._apply_matrices(shape, self.matrix)
+        drawing.add(shape)
 
 class Ellipse(Shape):
-    def __init__(self, center=(0,0), radii=(1,1), **extra):
+    def __init__(self, center=(0,0), radii=(1,1), **extras):
         super(Ellipse, self).__init__(center)
-        if "fill" not in extra:
-            extra["fill"] = "purple"
-        if "stroke" not in extra:
-            extra["stroke"] = "black"
-        if "stroke_width" not in extra:
-            extra["stroke_width"] = 1
         if isinstance(radii, tuple):
             self.radii = list(radii)
         else:
             self.radii = radii
-        self.extra = extra
+        self.extras = extras
 
     def __repr__(self):
         return "<Ellipse %s>" % str(self.radii)
@@ -362,13 +458,15 @@ class Ellipse(Shape):
         return self.canvas
 
     def _add(self, drawing):
-        drawing.add(drawing.ellipse(center=self.center, r=self.radii, **self.extra))
+        shape = drawing.ellipse(center=self.center, r=self.radii, **self.extras)
+        self._apply_matrices(shape, self.matrix)
+        drawing.add(shape)
 
 class Polyline(Shape):
-    def __init__(self, points=[], **extra):
+    def __init__(self, points=[], **extras):
         super(Polyline, self).__init__()
         self.points = points # not a copy FIXME
-        self.extra = extra
+        self.extras = extras
 
     def __repr__(self):
         return "<Polyline %s>" % str(self.points)
@@ -386,19 +484,15 @@ class Polyline(Shape):
         return self.canvas
 
     def _add(self, drawing):
-        drawing.add(drawing.polyline(points=self.points, **self.extra))
+        shape = drawing.polyline(points=self.points, **self.extras)
+        self._apply_matrices(shape, self.matrix)
+        drawing.add(shape)
 
 class Polygon(Shape):
-    def __init__(self, points=[], **extra):
+    def __init__(self, points=[], **extras):
         super(Polygon, self).__init__()
-        if "fill" not in extra:
-            extra["fill"] = "purple"
-        if "stroke" not in extra:
-            extra["stroke"] = "black"
-        if "stroke_width" not in extra:
-            extra["stroke_width"] = 1
         self.points = points # not a copy FIXME
-        self.extra = extra
+        self.extras = extras
 
     def __repr__(self):
         return "<Polygon %s>" % str(self.points)
@@ -416,15 +510,17 @@ class Polygon(Shape):
         return self.canvas
 
     def _add(self, drawing):
-        drawing.add(drawing.polygon(points=self.points, **self.extra))
+        shape = drawing.polygon(points=self.points, **self.extras)
+        self._apply_matrices(shape, self.matrix)
+        drawing.add(shape)
 
 class Picture(Shape):
-    def __init__(self, href, start=None, size=None, **extra):
+    def __init__(self, href, start=None, size=None, **extras):
         super(Picture, self).__init__()
         self.href = href
         self.start = start
         self.size = size
-        self.extra = extra
+        self.extras = extras
 
     def __repr__(self):
         return "<Picture %s,%s>" % (self.start, self.size)
@@ -438,7 +534,9 @@ class Picture(Shape):
         return self.canvas
 
     def _add(self, drawing):
-        drawing.add(drawing.image(self.href, insert=self.start, size=self.size, **self.extra))
+        shape = drawing.image(self.href, insert=self.start, size=self.size, **self.extras)
+        self._apply_matrices(shape, self.matrix)
+        drawing.add(shape)
 
 class Plot(Canvas):
     """
@@ -492,28 +590,28 @@ class BarChart(Plot):
             self.draw( Text(str(max_count * count/4)[0:5],
                             (0, 1.2 * self.frame_size + self.plot_height - count/4 * self.plot_height)))
 
-#g(**extra) # Group
-#symbol(**extra)
-#svg(insert=None, size=None, **extra)
-#use(href, insert=None, size=None, **extra)
-#a(href, target='_blank', **extra) # Link
-#marker(insert=None, size=None, orient=None, **extra)
-#script(href=None, content='', **extra)
-#style(content='', **extra)
-#linearGradient(start=None, end=None, inherit=None, **extra)
-#radialGradient(center=None, r=None, focal=None, inherit=None, **extra)
-#mask(start=None, size=None, **extra)
-#clipPath(**extra)
-#set(element=None, **extra)
+#g(**extras) # Group
+#symbol(**extras)
+#svg(insert=None, size=None, **extras)
+#use(href, insert=None, size=None, **extras)
+#a(href, target='_blank', **extras) # Link
+#marker(insert=None, size=None, orient=None, **extras)
+#script(href=None, content='', **extras)
+#style(content='', **extras)
+#linearGradient(start=None, end=None, inherit=None, **extras)
+#radialGradient(center=None, r=None, focal=None, inherit=None, **extras)
+#mask(start=None, size=None, **extras)
+#clipPath(**extras)
+#set(element=None, **extras)
 
-#tspan(text, insert=None, x=[], y=[], dx=[], dy=[], rotate=[], **extra) # TextSpan
-#tref(element, **extra)
-#textPath(path, text, startOffset=None, method='align', spacing='exact', **extra)
-#textArea(text=None, insert=None, size=None, **extra)
-#path(d=None, **extra)
+#tspan(text, insert=None, x=[], y=[], dx=[], dy=[], rotate=[], **extras) # TextSpan
+#tref(element, **extras)
+#textPath(path, text, startOffset=None, method='align', spacing='exact', **extras)
+#textArea(text=None, insert=None, size=None, **extras)
+#path(d=None, **extras)
 
-#animate(element=None, **extra)
-#animateColor(element=None, **extra)
-#animateMotion(element=None, **extra)
-#animateTransform(transform, element=None, **extra)
-#filter(start=None, size=None, resolution=None, inherit=None, **extra)
+#animate(element=None, **extras)
+#animateColor(element=None, **extras)
+#animateMotion(element=None, **extras)
+#animateTransform(transform, element=None, **extras)
+#filter(start=None, size=None, resolution=None, inherit=None, **extras)
