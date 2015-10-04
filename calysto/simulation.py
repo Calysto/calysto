@@ -1,12 +1,14 @@
 from calysto.display import display, clear_output
 from calysto.graphics import (Canvas, Polygon, Rectangle, 
                               Color, Line, Ellipse, Arc)
+import traceback
 import threading
+import random
 import math
 import time
 
 def rotateAround(x1, y1, length, angle):
-    return [x1 + length * math.cos(-angle), y1 - length * math.sin(-angle)]
+    return Point(x1 + length * math.cos(-angle), y1 - length * math.sin(-angle))
 
 class Point(object):
     def __init__(self, x, y, z=0):
@@ -20,6 +22,14 @@ class Point(object):
     def __iter__(self):
         yield self.x
         yield self.y
+
+    def __getitem__(self, pos):
+        if pos == 0:
+            return self.x
+        elif pos == 1:
+            return self.y
+        elif pos == 2:
+            return self.z
 
 class Drawable(object):
     def __init__(self, points, color):
@@ -56,7 +66,7 @@ class World(object):
         self.sim_time = .1  # every update advances this much time
         self.gui_time = .25 # update screen this often
 
-    def start_sim(self, gui=True):
+    def start_sim(self, gui=True, set_value=None):
         """
         Run the simulation in the background, showing the GUI by default.
         """
@@ -64,20 +74,23 @@ class World(object):
             def loop():
                 self.need_to_stop.clear()
                 self.is_running.set()
+                count = 0
                 while not self.need_to_stop.isSet():
                     for robot in self.robots:
                         robot.update()
                     if gui:
                         self.draw()
+                    if set_value and count % 2 == 0:
+                        set_value.value = str(self.render())
                     self.realsleep(self.sim_time)
                     self.clock += self.sim_time
+                    count += 1
                 self.is_running.clear()
+                for robot in self.robots:
+                    robot.stop()
             threading.Thread(target=loop).start()
 
-    def draw(self):
-        """
-        Render and draw the world and robots.
-        """
+    def render(self):
         canvas = Canvas(size=(self.w, self.h))
         rect = Rectangle((self.at_x, self.at_y), (self.w, self.h))
         rect.fill(Color(0, 128, 0))
@@ -87,6 +100,13 @@ class World(object):
             wall.draw(canvas)
         for robot in self.robots:
             robot.draw(canvas)
+        return canvas
+
+    def draw(self):
+        """
+        Render and draw the world and robots.
+        """
+        canvas = self.render()
         clear_output(wait=True)
         display(canvas)
 
@@ -123,12 +143,18 @@ class World(object):
         """
         Run a brain program in the background.
         """
+        ERROR.value = ""
         def wrapper():
             try:
                 f()
             except KeyboardInterrupt:
                 # Just stop
                 pass
+            except Exception as e:
+                if ERROR is not None:
+                    ERROR.value = "<pre>" + traceback.format_exc() + "</pre>"
+                else:
+                    raise
             # Otherwise, will show error
         threading.Thread(target=wrapper).start()
 
@@ -172,11 +198,13 @@ class Robot(object):
         self.va = 0.0 ## turn velocity
         ## sensors 
         self.stalled = False
-        self.bounding_box = [0] * 4
-        self.robot_color = Color(255, 0, 0)
+        self.bounding_box = [Point(0, 0)] * 4
+        self.color = Color(255, 0, 0)
         self.ir_sensors = [None] * 2
         self.max_ir = 1/5 # ratio of robot
-        self.camera = [0] * 256
+        self.camera = [None] * 256
+
+    ### Movements:
 
     def sleep(self, seconds):
         self.world.sleep(seconds)
@@ -198,14 +226,14 @@ class Robot(object):
             raise KeyboardInterrupt()
     
     def turnLeft(self, seconds, va=math.pi/180):
-        self.va = va
+        self.va = va * 2
         self.sleep(seconds)
         self.va = 0
         if self.world.need_to_stop.is_set():
             raise KeyboardInterrupt()
     
     def turnRight(self, seconds, va=math.pi/180):
-        self.va = -va
+        self.va = -va * 2
         self.sleep(seconds)
         self.va = 0
         if self.world.need_to_stop.is_set():
@@ -220,28 +248,30 @@ class Robot(object):
             return 1.0
     
     def takePicture(self):
-        pic = PImage(256, 128)
+        from PIL import Image
+        pic = Image.new("RGB", (256, 128))
         size = max(self.world.w, self.world.h)
         for i in range(len(self.camera)):
             hit = self.camera[i]
             if (hit != None):
                 s = max(min(1.0 - hit.distance/size, 1.0), 0.0)
-                r = red(hit.col)
-                g = green(hit.col)
-                b = blue(hit.col)
-                hcolor = color(r * s, g * s, b * s)
+                r = hit.color.red
+                g = hit.color.green
+                b = hit.color.blue
+                hcolor = (int(r * s), int(g * s), int(b * s))
                 high = (1.0 - s) * 128
                 ##pg.line(i, 0 + high/2, i, 128 - high/2)
             else:
                 high = 0
+                hcolor = None
             for j in range(128):
                 if (j < high/2): ##256 - high/2.0): ## sky
-                    pic.set(i, j, color(0, 0, 128))
+                    pic.putpixel((i, j), (0, 0, 128))
                 elif (j < 128 - high/2): ##256 - high and hcolor != None): ## hit
                     if (hcolor != None):
-                        pic.set(i, j, hcolor)
+                        pic.putpixel((i, j), hcolor)
                 else: ## ground
-                    pic.set(i, j, color(0, 128, 0))
+                    pic.putpixel((i, j), (0, 128, 0))
         return pic
     
     def stop(self):
@@ -329,6 +359,34 @@ class Robot(object):
             if (pos != None):
                 dist = self.distance(pos[0], pos[1], x1, y1)
                 hits.append(Hit(pos[0], pos[1], dist, wall.color, x1, y1))
+
+        for robot in self.world.robots:
+            if robot is self:
+                continue
+            v1 = robot.bounding_box[0]
+            v2 = robot.bounding_box[1]
+            v3 = robot.bounding_box[2]
+            v4 = robot.bounding_box[3]
+            pos = self.intersect_hit(x1, y1, x2, y2, v1.x, v1.y, v2.x, v2.y)
+            if (pos != None):
+                dist = self.distance(pos[0], pos[1], x1, y1)
+                hits.append(Hit(pos[0], pos[1], dist, robot.color, x1, y1))
+            
+            pos = self.intersect_hit(x1, y1, x2, y2, v2.x, v2.y, v3.x, v3.y)
+            if (pos != None):
+                dist = self.distance(pos[0], pos[1], x1, y1)
+                hits.append(Hit(pos[0], pos[1], dist, robot.color, x1, y1))
+            
+            pos = self.intersect_hit(x1, y1, x2, y2, v3.x, v3.y, v4.x, v4.y)
+            if (pos != None):
+                dist = self.distance(pos[0], pos[1], x1, y1)
+                hits.append(Hit(pos[0], pos[1], dist, robot.color, x1, y1))
+            
+            pos = self.intersect_hit(x1, y1, x2, y2, v4.x, v4.y, v1.x, v1.y)
+            if (pos != None):
+                dist = self.distance(pos[0], pos[1], x1, y1)
+                hits.append(Hit(pos[0], pos[1], dist, robot.color, x1, y1))
+
         if len(hits) == 0:
             return None
         else:
@@ -405,6 +463,52 @@ class Robot(object):
                                v4.x, v4.y, v1.x, v1.y)):
                 self.stalled = True
                 break
+
+        for robot in self.world.robots:
+            if robot is self:
+                continue
+            v1 = robot.bounding_box[0]
+            v2 = robot.bounding_box[1]
+            v3 = robot.bounding_box[2]
+            v4 = robot.bounding_box[3]
+            ## p1 to p2
+            if (self.intersect(p1[0], p1[1], p2[0], p2[1],     
+                               v1.x, v1.y, v2.x, v2.y) or
+                self.intersect(p1[0], p1[1], p2[0], p2[1], 
+                               v2.x, v2.y, v3.x, v3.y) or
+                self.intersect(p1[0], p1[1], p2[0], p2[1], 
+                               v3.x, v3.y, v4.x, v4.y) or
+                self.intersect(p1[0], p1[1], p2[0], p2[1], 
+                               v4.x, v4.y, v1.x, v1.y) or
+                ## p2 to p3
+                self.intersect(p2[0], p2[1], p3[0], p3[1], 
+                               v1.x, v1.y, v2.x, v2.y) or
+                self.intersect(p2[0], p2[1], p3[0], p3[1], 
+                               v2.x, v2.y, v3.x, v3.y) or
+                self.intersect(p2[0], p2[1], p3[0], p3[1], 
+                               v3.x, v3.y, v4.x, v4.y) or
+                self.intersect(p2[0], p2[1], p3[0], p3[1], 
+                               v4.x, v4.y, v1.x, v1.y) or
+                ## p3 to p4
+                self.intersect(p3[0], p3[1], p4[0], p4[1], 
+                               v1.x, v1.y, v2.x, v2.y) or
+                self.intersect(p3[0], p3[1], p4[0], p4[1], 
+                               v2.x, v2.y, v3.x, v3.y) or
+                self.intersect(p3[0], p3[1], p4[0], p4[1], 
+                               v3.x, v3.y, v4.x, v4.y) or
+                self.intersect(p3[0], p3[1], p4[0], p4[1], 
+                               v4.x, v4.y, v1.x, v1.y) or
+                ## p4 to p1
+                self.intersect(p4[0], p4[1], p1[0], p1[1], 
+                               v1.x, v1.y, v2.x, v2.y) or
+                self.intersect(p4[0], p4[1], p1[0], p1[1], 
+                               v2.x, v2.y, v3.x, v3.y) or
+                self.intersect(p4[0], p4[1], p1[0], p1[1], 
+                               v3.x, v3.y, v4.x, v4.y) or
+                self.intersect(p4[0], p4[1], p1[0], p1[1], 
+                               v4.x, v4.y, v1.x, v1.y)):
+                self.stalled = True
+                break
         
         if (not self.stalled):
             ## if no intersection, make move
@@ -412,7 +516,7 @@ class Robot(object):
             self.y = py 
             self.direction = pdirection 
         else:
-            self.direction += random.random(.2) - .1
+            self.direction += (random.random() * .2) - .1
         
         ## update sensors, camera:
         ## on right:
@@ -477,7 +581,7 @@ class Robot(object):
             canvas.fill(Color(128, 128, 128))
             canvas.stroke(Color(255, 255, 255))
         else:
-            canvas.fill(self.robot_color)
+            canvas.fill(self.color)
             canvas.noStroke()
         
         points = []
@@ -527,15 +631,6 @@ class Robot(object):
         arc = Arc((p1[0], p1[1]), dist, self.direction - .5, self.direction + .5)
         arc.draw(canvas)
 
-SIMULATION = None
-
-def simulation(w, h, *robots):
-    global SIMULATION
-    SIMULATION = World(w, h)
-    for robot in robots:
-        SIMULATION.addRobot(robot)
-    return SIMULATION
-
 def forward(*args, **kwargs):
     SIMULATION.robots[0].forward(*args, **kwargs)
 
@@ -553,3 +648,64 @@ def stop(*args, **kwargs):
 
 def sleep(seconds=1):
     SIMULATION.robots[0].sleep(seconds)
+
+### ------------------------------------
+
+SIMULATION = None
+
+def get_sim():
+    return SIMULATION
+
+def get_robot(index=0):
+    return SIMULATION.robots[index]
+
+def simulation(w, h, *robots):
+    global SIMULATION
+    SIMULATION = World(w, h)
+    for robot in robots:
+        SIMULATION.addRobot(robot)
+    return SIMULATION
+
+ERROR = None
+
+def widget():
+    global ERROR
+    try:
+        from ipywidgets import widgets
+    except:
+        from IPython.html import widgets
+
+    def restart(x, y, direction):
+        world.stop_sim()
+        robot.x = x
+        robot.y = y
+        robot.direction = direction
+        canvas.value = str(world.render())
+        time.sleep(.250)
+        world.start_sim(gui=False, set_value=canvas)
+
+    def stop_and_start(obj):
+        world.stop_sim()
+        time.sleep(.250)
+        world.start_sim(gui=False, set_value=canvas)
+
+    canvas = widgets.HTML()
+    stop_button = widgets.Button(description="Stop")
+    restart_button = widgets.Button(description="Restart")
+    error = widgets.HTML("")
+    ERROR = error
+
+    robot = Robot(550, 350, -math.pi/2)
+    world = simulation(600, 400, robot)
+    world.start_sim(gui=False, set_value=canvas)
+
+    canvas.value = str(world.render())
+
+    sim = widgets.VBox([canvas, 
+                        widgets.HBox([stop_button, restart_button]),
+                        error])
+
+    stop_button.on_click(stop_and_start)
+    restart_button.on_click(lambda obj: restart(550, 350, -math.pi/2))
+
+    return sim
