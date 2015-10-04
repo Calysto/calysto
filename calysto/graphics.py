@@ -100,8 +100,8 @@ class Canvas(object):
             shape.extras["fill"] = self.fill_color
         if "stroke" not in shape.extras:
             shape.extras["stroke"] = self.stroke_color
-        if "stroke_width" not in shape.extras:
-            shape.extras["stroke_width"] = self.stroke_width_width
+        if "stroke-width" not in shape.extras:
+            shape.extras["stroke-width"] = self.stroke_width_width
         if "stroke-opacity" not in shape.extras:
             if self.stroke_opacity is not None:
                 shape.extras["stroke-opacity"] = self.stroke_opacity
@@ -273,7 +273,7 @@ class Shape(object):
             del self.extras["stroke-opacity"] 
 
     def stroke_width(self, width): 
-        self.extras["stroke_width"] = width
+        self.extras["stroke-width"] = width
 
     def moveToTop(self):
         self.canvas.shapes.remove(self)
@@ -331,7 +331,7 @@ class Arc(Shape):
         points = [(self.center[0], self.center[1])]
         while current < self.stop:
             points.append(rotate(self.center[0], self.center[1], self.radius, current))
-            current += math.pi/180
+            current += math.pi/180 * 5.0 # every five degrees
         extras = copy.copy(self.extras)
         extras["stroke-opacity"] = 0.0
         shape = drawing.polygon(points=points, **extras)
@@ -348,8 +348,8 @@ class Line(Shape):
         super(Line, self).__init__()
         if "stroke" not in extras:
             extras["stroke"] = "black"
-        if "stroke_width" not in extras:
-            extras["stroke_width"] = 1
+        if "stroke-width" not in extras:
+            extras["stroke-width"] = 1
         if isinstance(start, tuple):
             self.start = list(start)
         else:
