@@ -198,7 +198,7 @@ class Simulation(object):
                 pass
             except Exception as e:
                 if self.error:
-                    self.error.value = "<pre style='background: #fdd>" + traceback.format_exc() + "</pre>"
+                    self.error.value = "<pre style='background: #fdd'>" + traceback.format_exc() + "</pre>"
                 else:
                     raise
             finally:
