@@ -1,5 +1,5 @@
 from calysto.display import display, clear_output
-from calysto.graphics import (Canvas, Polygon, Rectangle, 
+from calysto.graphics import (Canvas, Polygon, Rectangle, Circle,
                               Color, Line, Ellipse, Arc, Text)
 import traceback
 import threading
@@ -68,6 +68,7 @@ class Simulation(object):
         self.need_to_stop = threading.Event()
         self.is_running = threading.Event()
         self.brain_running = threading.Event()
+        self.paused = threading.Event()
         self.clock = 0.0
         self.sim_time = .1  # every update advances this much time
         self.gui_time = .25 # update screen this often
@@ -75,6 +76,15 @@ class Simulation(object):
             self.addRobot(robot)
         self.error = None
         SIMULATION = self
+
+    def reset(self):
+        for robot in self.robots:
+            robot.stop()
+            robot.x = robot.ox
+            robot.y = robot.oy
+            robot.direction = robot.odirection
+            if robot.brain:
+                self.runBrain(robot.brain)
 
     def start_sim(self, gui=True, set_value=None, error=None):
         """
@@ -86,17 +96,21 @@ class Simulation(object):
             def loop():
                 self.need_to_stop.clear()
                 self.is_running.set()
+                for robot in self.robots:
+                    if robot.brain:
+                        self.runBrain(robot.brain)
                 count = 0
                 while not self.need_to_stop.isSet():
-                    for robot in self.robots:
-                        robot.update()
+                    if not self.paused.is_set():
+                        self.clock += self.sim_time
+                        for robot in self.robots:
+                            robot.update()
                     if gui:
                         self.draw()
                     if set_value and count % 2 == 0:
                         set_value.value = str(self.render())
-                    self.realsleep(self.sim_time)
-                    self.clock += self.sim_time
                     count += 1
+                    self.realsleep(self.sim_time)
                 self.is_running.clear()
                 for robot in self.robots:
                     robot.stop()
@@ -112,7 +126,16 @@ class Simulation(object):
             wall.draw(canvas)
         for robot in self.robots:
             robot.draw(canvas)
-        state = "Brain Running..." if self.brain_running.is_set() else "Idle"
+        if self.brain_running.is_set():
+            if not self.paused.is_set():
+                state = "Brain Running..." 
+            else:
+                state = "Brain paused!" 
+        else:
+            if not self.paused.is_set():
+                state = "Idle"
+            else:
+                state = "Paused"
         clock = Text("%.1f %s" % (self.clock, state), (15, self.h - 15))
         clock.fill("white")
         clock.stroke("white")
@@ -138,6 +161,9 @@ class Simulation(object):
 
     def stop_sim(self):
         self.need_to_stop.set()
+        time.sleep(.250)
+        for robot in self.robots:
+            robot.stop()
 
     def realsleep(self, seconds):
         """
@@ -172,7 +198,7 @@ class Simulation(object):
                 pass
             except Exception as e:
                 if self.error:
-                    self.error.value = "<pre>" + traceback.format_exc() + "</pre>"
+                    self.error.value = "<pre style='background: #fdd>" + traceback.format_exc() + "</pre>"
                 else:
                     raise
             finally:
@@ -211,9 +237,10 @@ class Robot(object):
         direction is in radians
         """
         self.simulation = None
-        self.x = x
-        self.y = y
-        self.direction = direction
+        self.brain = None
+        self.x = self.ox = x
+        self.y = self.oy= y
+        self.direction = self.odirection = direction
         self.debug = False
         self.vx = 0.0 ## velocity in x direction
         self.vy = 0.0 ## velocity in y direction
@@ -275,10 +302,12 @@ class Robot(object):
         self.sleep(seconds)
         self.va = 0
     
-    def getIR(self, pos):
+    def getIR(self, pos=None):
         ## 0 is on right, front
         ## 1 is on left, front
-        if (self.ir_sensors[pos] != None):
+        if pos is None:
+            return [self.getIR(0), self.getIR(1)]
+        elif (self.ir_sensors[pos] != None):
             return self.ir_sensors[pos].distance / (self.max_ir * self.simulation.scale)
         else:
             return 1.0
@@ -533,6 +562,9 @@ class Robot(object):
                     break
         return (p1, p2, p3, p4)
 
+    def bump_variability(self):
+        return (random.random() * .2) - .1
+
     def update(self):
         scale = self.simulation.scale
         tvx = self.vx * math.sin(-self.direction + math.pi/2) + self.vy * math.cos(-self.direction + math.pi/2)
@@ -551,7 +583,7 @@ class Robot(object):
                 self.direction = pdirection 
                 self.bounding_box = pbox
             else:
-                self.direction += (random.random() * .2) - .1
+                self.direction += self.bump_variability()
         
         ## update sensors, camera:
         ## on right:
@@ -654,7 +686,7 @@ class Robot(object):
             arc = Arc((p1[0], p1[1]), dist, self.direction - .5, self.direction + .5)
             arc.draw(canvas)
 
-class Bug(Robot):
+class LadyBug(Robot):
     def draw_body(self, canvas):
         scale = self.simulation.scale
         canvas.pushMatrix()
@@ -697,6 +729,47 @@ class Bug(Robot):
         eye.draw(canvas)
         canvas.popMatrix()
 
+class Spider(Robot):
+    def bump_variability(self):
+        return 0.0
+
+    def draw_body(self, canvas):
+        scale = self.simulation.scale
+        canvas.pushMatrix()
+        canvas.translate(self.x, self.y)
+        canvas.rotate(self.direction)
+        # Draw with front to right
+        width  = 0.2 * scale
+        length = 0.2 * scale
+        for x in [-length/8 * 2.5, -length/8, length/8, length/8 * 2.5]:
+            for side in [-1, 1]:
+                end = x + (random.random() * length/5) - length/10
+                leg = Line((x + length/7, 0), (end, (width/4 + width/4) * side))
+                leg.stroke_width(5)
+                leg.stroke("black")
+                leg.draw(canvas)
+                leg = Line((end, (width/4 + width/4) * side), (end - length/5, (width/4 + width/4 + length/5) * side))
+                leg.stroke_width(3)
+                leg.stroke("black")
+                leg.draw(canvas)
+        body = Ellipse((0,0), (length/3, width/3))
+        head = Circle((width/2, 0), width/5)
+        if not self.stalled:
+            body.fill("black")
+            head.fill("black")
+        else:
+            body.fill("gray")
+            head.fill("gray")
+        body.draw(canvas)
+        head.draw(canvas)
+        eye = Ellipse((length/2, width/5), (.01 * scale, .01 * scale))
+        eye.fill("white")
+        eye.draw(canvas)
+        eye = Ellipse((length/2, -width/5), (.01 * scale, .01 * scale))
+        eye.fill("white")
+        eye.draw(canvas)
+        canvas.popMatrix()
+
 ### ------------------------------------
 
 def get_sim():
@@ -721,12 +794,9 @@ def View(sim_filename):
 
     def restart(x, y, direction):
         simulation.stop_sim()
-        robot = get_robot()
-        robot.x = x
-        robot.y = y
-        robot.direction = direction
-        canvas.value = str(simulation.render())
         time.sleep(.250)
+        simulation.reset()
+        canvas.value = str(simulation.render())
         simulation.start_sim(gui=False, set_value=canvas, error=error)
 
     def stop_and_start(obj):
@@ -734,9 +804,19 @@ def View(sim_filename):
         time.sleep(.250)
         simulation.start_sim(gui=False, set_value=canvas, error=error)
 
+    def toggle_pause(obj):
+        if simulation.paused.is_set():
+            simulation.paused.clear()
+            pause_button.description = "Pause Simulation"
+        else:
+            simulation.paused.set()
+            pause_button.description = "Resume Simulation"
+
     canvas = widgets.HTML()
     stop_button = widgets.Button(description="Stop Brain")
+    stop_sim_button = widgets.Button(description="Stop Simulation")
     restart_button = widgets.Button(description="Restart Simulation")
+    pause_button = widgets.Button(description="Pause Simulation")
     error = widgets.HTML("")
 
     simulation = loadSimulation(sim_filename)
@@ -745,10 +825,15 @@ def View(sim_filename):
     canvas.value = str(simulation.render())
 
     sim_widgets = widgets.VBox([canvas, 
-                                widgets.HBox([stop_button, restart_button]),
+                                widgets.HBox([stop_sim_button, 
+                                              stop_button, 
+                                              restart_button,
+                                              pause_button]),
                                 error])
 
     stop_button.on_click(stop_and_start)
+    stop_sim_button.on_click(lambda obj: simulation.stop_sim())
     restart_button.on_click(lambda obj: restart(550, 350, -math.pi/2))
+    pause_button.on_click(toggle_pause)
 
     return sim_widgets

@@ -1,4 +1,8 @@
-from IPython.html.widgets import DOMWidget
+try:
+    from ipywidgets.widgets import DOMWidget
+except:
+    from IPython.html.widgets import DOMWidget
+
 from IPython.utils.traitlets import Unicode, Bytes, Instance
 from IPython.display import Javascript
 

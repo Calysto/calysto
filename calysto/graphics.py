@@ -256,8 +256,8 @@ class Shape(object):
         self.extras["fill"] = str(color)
         if isinstance(color, Color):
             self.extras["fill-opacity"] = color.alpha/255
-        elif "fill-opacity" in self.extras:
-            del self.extras["fill-opacity"] 
+        else:
+            self.extras["fill-opacity"] = 1.0
 
     def noFill(self):
         self.extras["fill-opacity"] = 0.0
@@ -269,8 +269,8 @@ class Shape(object):
         self.extras["stroke"] = str(color)
         if isinstance(color, Color):
             self.extras["stroke-opacity"] = color.alpha/255
-        elif "stroke-opacity" in self.extras:
-            del self.extras["stroke-opacity"] 
+        else:
+            self.extras["stroke-opacity"] = 1.0
 
     def stroke_width(self, width): 
         self.extras["stroke-width"] = width
