@@ -1,4 +1,4 @@
-from calysto.simulation import LadyBug, Spider, Simulation
+from calysto.simulation import LadyBug, Spider, Simulation, Color
 import math
 
 def makeSimulation():
