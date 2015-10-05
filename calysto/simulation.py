@@ -293,12 +293,12 @@ class Robot(object):
         self.vx = 0
     
     def turnLeft(self, seconds, va=math.pi/180):
-        self.va = va * 2
+        self.va = va * 4
         self.sleep(seconds)
         self.va = 0
     
     def turnRight(self, seconds, va=math.pi/180):
-        self.va = -va * 2
+        self.va = -va * 4
         self.sleep(seconds)
         self.va = 0
     
