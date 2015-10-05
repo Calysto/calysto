@@ -71,7 +71,8 @@ class Simulation(object):
         self.paused = threading.Event()
         self.clock = 0.0
         self.sim_time = .1  # every update advances this much time
-        self.gui_time = .25 # update screen this often
+        self.gui_time = .25 # update screen this often; used in watch
+        self.gui_update = 5 # used in widget-based view
         for robot in robots:
             self.addRobot(robot)
         self.error = None
@@ -107,7 +108,7 @@ class Simulation(object):
                             robot.update()
                     if gui:
                         self.draw()
-                    if set_value and count % 2 == 0:
+                    if set_value and count % self.gui_update == 0:
                         set_value.value = str(self.render())
                     count += 1
                     self.realsleep(self.sim_time)
@@ -214,6 +215,9 @@ class Simulation(object):
                     color)
         self.walls.append(wall)
 
+    def set_gui_update(self, value):
+        self.gui_update = value
+        
     def setScale(self, s):
         ## scale the world... > 1 make it bigger
         self.scale = s * 250
@@ -824,6 +828,7 @@ def View(sim_filename):
     stop_sim_button = widgets.Button(description="Stop Simulation")
     restart_button = widgets.Button(description="Restart Simulation")
     pause_button = widgets.Button(description="Pause Simulation")
+    gui_button = widgets.IntSlider(description="GUI Update Interval", min=1, max=10, value=5)
     error = widgets.HTML("")
 
     simulation = loadSimulation(sim_filename)
@@ -832,15 +837,18 @@ def View(sim_filename):
     canvas.value = str(simulation.render())
 
     sim_widgets = widgets.VBox([canvas, 
+                                gui_button,
                                 widgets.HBox([stop_sim_button, 
-                                              stop_button, 
+                                              #stop_button, 
                                               restart_button,
-                                              pause_button]),
+                                              #pause_button,
+                                              ]),
                                 error])
 
     stop_button.on_click(stop_and_start)
     stop_sim_button.on_click(lambda obj: simulation.stop_sim())
     restart_button.on_click(lambda obj: restart(550, 350, -math.pi/2))
     pause_button.on_click(toggle_pause)
+    gui_button.on_trait_change(lambda *args: simulation.set_gui_update(gui_button.value), "value")
 
     return sim_widgets
