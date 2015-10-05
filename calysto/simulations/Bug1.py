@@ -16,9 +16,9 @@ def makeSimulation():
         spider.stop()
     spider.brain = spiderBrain
     simulation = Simulation(600, 400, ladybug, spider)
-    simulation.makeWall(500, 100, 10, 200, "yellow")
-    simulation.makeWall(10, 100, 190, 10, "yellow")
-    simulation.makeWall(300, 100, 200, 10, "yellow")
-    simulation.makeWall(100, 300, 410, 10, "yellow")
-    simulation.makeWall(10, 200, 390, 10, "yellow")
+    simulation.makeWall(500, 100, 10, 200, Color(255, 255, 0))
+    simulation.makeWall(10, 100, 190, 10, Color(255, 255, 0))
+    simulation.makeWall(300, 100, 200, 10, Color(255, 255, 0))
+    simulation.makeWall(100, 300, 410, 10, Color(255, 255, 0))
+    simulation.makeWall(10, 200, 390, 10, Color(255, 255, 0))
     return simulation

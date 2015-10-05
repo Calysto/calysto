@@ -137,8 +137,8 @@ class Simulation(object):
             else:
                 state = "Paused"
         clock = Text("%.1f %s" % (self.clock, state), (15, self.h - 15))
-        clock.fill("white")
-        clock.stroke("white")
+        clock.fill(Color(255, 255, 255))
+        clock.stroke(Color(255, 255, 255))
         clock.stroke_width(1)
         clock.draw(canvas)
         return canvas
@@ -324,9 +324,16 @@ class Robot(object):
                 hit = self.camera[i]
                 if (hit != None):
                     s = max(min(1.0 - hit.distance/size, 1.0), 0.0)
-                    r = hit.color.red
-                    g = hit.color.green
-                    b = hit.color.blue
+                    if isinstance(hit.color, Color):
+                        r = hit.color.red
+                        g = hit.color.green
+                        b = hit.color.blue
+                    else:
+                        try:
+                            import webcolors
+                            r, g, b = webcolors.name_to_rgb(hit.color)
+                        except:
+                            r, g, b = (128, 128, 128)
                     hcolor = (int(r * s), int(g * s), int(b * s))
                     high = (1.0 - s) * 128
                     ##pg.line(i, 0 + high/2, i, 128 - high/2)
@@ -708,10 +715,10 @@ class LadyBug(Robot):
         if not self.stalled:
             body.fill(self.color)
         else:
-            body.fill("gray")
+            body.fill(Color(128, 128, 128))
         body.draw(canvas)
         head = Arc((width/2, 0), width/3, -math.pi/2, math.pi/2)
-        head.fill("black")
+        head.fill(Color(0, 0, 0))
         head.draw(canvas)
         line = Line((width/1.5, 0), (-width/1.5, 0))
         line.draw(canvas)
@@ -719,13 +726,13 @@ class LadyBug(Robot):
                     (-length/5, -width/3), (length/5, -width/5),
                     (-length/4, width/4)]:
             spot = Ellipse((x, y), (length/20, length/20))
-            spot.fill("black")
+            spot.fill(Color(0, 0, 0))
             spot.draw(canvas)
         eye = Ellipse((length/2, width/5), (.01 * scale, .01 * scale))
-        eye.fill("white")
+        eye.fill(Color(255, 255, 255))
         eye.draw(canvas)
         eye = Ellipse((length/2, -width/5), (.01 * scale, .01 * scale))
-        eye.fill("white")
+        eye.fill(Color(255, 255, 255))
         eye.draw(canvas)
         canvas.popMatrix()
 
@@ -746,27 +753,27 @@ class Spider(Robot):
                 end = x + (random.random() * length/5) - length/10
                 leg = Line((x + length/7, 0), (end, (width/4 + width/4) * side))
                 leg.stroke_width(5)
-                leg.stroke("black")
+                leg.stroke(Color(0, 0, 0))
                 leg.draw(canvas)
                 leg = Line((end, (width/4 + width/4) * side), (end - length/5, (width/4 + width/4 + length/5) * side))
                 leg.stroke_width(3)
-                leg.stroke("black")
+                leg.stroke(Color(0, 0, 0))
                 leg.draw(canvas)
         body = Ellipse((0,0), (length/3, width/3))
         head = Circle((width/2, 0), width/5)
         if not self.stalled:
-            body.fill("black")
-            head.fill("black")
+            body.fill(Color(0, 0, 0))
+            head.fill(Color(0, 0, 0))
         else:
-            body.fill("gray")
-            head.fill("gray")
+            body.fill(Color(128, 128, 128))
+            head.fill(Color(128, 128, 128))
         body.draw(canvas)
         head.draw(canvas)
         eye = Ellipse((length/2, width/5), (.01 * scale, .01 * scale))
-        eye.fill("white")
+        eye.fill(Color(255, 255, 255))
         eye.draw(canvas)
         eye = Ellipse((length/2, -width/5), (.01 * scale, .01 * scale))
-        eye.fill("white")
+        eye.fill(Color(255, 255, 255))
         eye.draw(canvas)
         canvas.popMatrix()
 

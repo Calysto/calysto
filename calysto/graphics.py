@@ -33,8 +33,8 @@ class Canvas(object):
         self.shapes = []
         self._viewbox = None
         self.matrix = []
-        self.fill_color = "purple"
-        self.stroke_color = "black"
+        self.fill_color = Color(128, 0, 128)
+        self.stroke_color = Color(0, 0, 0)
         self.stroke_width_width = 1
         self.fill_opacity = None
         self.stroke_opacity = None
@@ -347,7 +347,7 @@ class Line(Shape):
     def __init__(self, start=(0,0), end=(0,0), **extras):
         super(Line, self).__init__()
         if "stroke" not in extras:
-            extras["stroke"] = "black"
+            extras["stroke"] = Color(0, 0, 0)
         if "stroke-width" not in extras:
             extras["stroke-width"] = 1
         if isinstance(start, tuple):
@@ -558,7 +558,7 @@ class Plot(Canvas):
                                      self.plot_boundaries[1]),
                                     (self.plot_width, self.plot_height))
         self.background.noFill()
-        self.background.stroke("#000000")
+        self.background.stroke(Color(0, 0, 0))
         self.draw(self.background)
 
 class BarChart(Plot):
