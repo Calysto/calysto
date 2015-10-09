@@ -1,4 +1,3 @@
-from calysto.display import display, clear_output
 from calysto.graphics import (Canvas, Polygon, Rectangle, Circle,
                               Color, Line, Ellipse, Arc, Text)
 import traceback
@@ -148,6 +147,7 @@ class Simulation(object):
         """
         Render and draw the world and robots.
         """
+        from calysto.display import display, clear_output
         canvas = self.render()
         clear_output(wait=True)
         display(canvas)

@@ -1,3 +1,10 @@
+"""
+Parts based on John Zelle's graphics.py
+http://mcsp.wartburg.edu/zelle/python/ppics2/index.html
+
+LICENSE: This is open-source software released under the terms of the
+GPL (http://www.gnu.org/licenses/gpl.html).
+"""
 
 __all__ = [
     # The container:
@@ -5,7 +12,7 @@ __all__ = [
     # Shapes:
     'Shape', 'Line', 'Circle', 'Text', 'Rectangle', 
     'Ellipse', 'Polyline', 'Polygon', 'Picture', 'Arc',
-    'BarChart',
+    'BarChart', 'Point', 
     # Pixel-based items:
     'Pixel', 'Color',
     # Units:
@@ -23,6 +30,33 @@ from cairosvg.parser import Tree
 def rotate(x, y, length, radians):
     return (x + length * math.cos(-radians), y - length * math.sin(-radians))
 
+class Transform:
+    """
+    Internal class for 2-D coordinate transformations
+    """
+    def __init__(self, w, h, xlow, ylow, xhigh, yhigh):
+        # w, h are width and height of window
+        # (xlow,ylow) coordinates of lower-left [raw (0,h-1)]
+        # (xhigh,yhigh) coordinates of upper-right [raw (w-1,0)]
+        xspan = (xhigh-xlow)
+        yspan = (yhigh-ylow)
+        self.xbase = xlow
+        self.ybase = yhigh
+        self.xscale = xspan/float(w-1)
+        self.yscale = yspan/float(h-1)
+        
+    def screen(self,x,y):
+        # Returns x,y in screen (actually window) coordinates
+        xs = (x-self.xbase) / self.xscale
+        ys = (self.ybase-y) / self.yscale
+        return int(xs+0.5),int(ys+0.5)
+        
+    def world(self,xs,ys):
+        # Returns xs,ys in world coordinates
+        x = xs*self.xscale + self.xbase
+        y = self.ybase - ys*self.yscale
+        return x,y
+
 class Canvas(object):
     def __init__(self, filename="noname.svg", size=(300, 300), **extras):
         if "debug" not in extras:
@@ -38,6 +72,7 @@ class Canvas(object):
         self.stroke_width_width = 1
         self.fill_opacity = None
         self.stroke_opacity = None
+        self.trans = None
 
     def __repr__(self):
         return "<Canvas %s>" % str(self.size)
@@ -48,12 +83,50 @@ class Canvas(object):
             drawing.viewbox(*self._viewbox)
         return drawing
 
+    def setCoords(self, x1, y1, x2, y2):
+        """Set coordinates of window to run from (x1,y1) in the
+        lower-left corner to (x2,y2) in the upper-right corner."""
+        self.trans = Transform(self.size[0], self.size[1], x1, y1, x2, y2)
+
+    def toScreen(self, x, y):
+        if self.trans:
+            return self.trans.screen(x,y)
+        else:
+            return x,y
+                      
+    def toWorld(self, x, y):
+        if self.trans:
+            return self.trans.world(x,y)
+        else:
+            return x,y
+        
+    def toScaleX(self, v):
+        if self.trans:
+            return v/self.trans.xscale
+        else:
+            return v
+
+    def toScaleY(self, v):
+        if self.trans:
+            return v/self.trans.yscale
+        else:
+            return v
+
     def fill(self, color):
         self.fill_color = color
         if isinstance(color, Color):
             self.fill_opacity = color.alpha/255
         else:
             self.fill_opacity = None
+
+    def setFill(self, color):
+        self.fill(color)
+
+    def setOutline(self, color):
+        self.stroke(color)
+
+    def setWidth(self, pixels):
+        self.stroke_width(pixels)
 
     def noFill(self):
         self.fill_opacity = 0.0
@@ -87,14 +160,17 @@ class Canvas(object):
         self._viewbox = (xmin, ymin, width, height)
 
     def save(self, filename=None):
-        canvas = self._render()
+        drawing = self._render()
         if filename:
-            canvas.saveas(filename)
+            drawing.saveas(filename)
         else:
-            canvas.save()
+            drawing.save()
 
     def draw(self, shape):
         shape.canvas = self
+        shape.t = shape.canvas.toScreen
+        shape.tx = shape.canvas.toScaleX
+        shape.ty = shape.canvas.toScaleY
         shape.matrix = copy.copy(self.matrix)
         if "fill" not in shape.extras:
             shape.extras["fill"] = self.fill_color
@@ -116,11 +192,16 @@ class Canvas(object):
         del self.shapes[shape]
         return self
 
-    def _repr_svg_(self):
-        canvas = self._render()
+    def get_html(self, **attribs):
+        return self._repr_svg_(**attribs)
+
+    def _repr_svg_(self, **attribs):
+        drawing = self._render()
+        for key in attribs:
+            drawing.attribs[key] = attribs[key]
         for shape in self.shapes:
-            shape._add(canvas)
-        return canvas.tostring()
+            shape._add(drawing)
+        return drawing.tostring()
 
     def _repr_png_(self):
         return self.convert(format="png")
@@ -163,6 +244,12 @@ class Canvas(object):
     def sortByZ(self):
         self.shapes.sort(key=lambda shape: shape.z)
 
+    def clear(self):
+        """
+        Clear all of the shapes.
+        """
+        self.shapes.clear()
+
 class Pixel(object):
     """
     Wrapper interface to numpy array.
@@ -171,6 +258,12 @@ class Pixel(object):
         self.array = array
         self.x = x
         self.y = y
+
+    def getX(self):
+        return self.x
+
+    def getY(self):
+        return self.y
 
     def getColor(self, x, y):
         return Color(*self.array[x, y])
@@ -210,6 +303,8 @@ class Shape(object):
             self.center = center # use directly, no copy
         self.extras = extras
         self.canvas = None
+        # Transforms:
+        self.t = self.tx = self.ty = None
         self.direction = 0
         self.pen = False
         self.z = 0
@@ -221,7 +316,20 @@ class Shape(object):
         canvas.draw(self)
         return canvas
 
+    def undraw(self):
+        del self.canvas.shapes[self]
+        self.canvas = None
+        self.t = self.tx = self.ty = None
+        return self
+
+    def clone(self):
+        """
+        """
+        pass
+        #return clone, not drawn
+
     def _add(self, drawing):
+        # Shape._add
         pass
 
     def _apply_matrices(self, shape, matrices):
@@ -249,7 +357,10 @@ class Shape(object):
             Line(start, self.center, **self.extras).draw(self.canvas)
             return self.canvas
 
-    def rotate(self, degrees): 
+    def turn(self, degrees): 
+        """
+        Turn the shape direction by these degrees. 
+        """
         self.direction -= (math.pi / 180.0) * degrees
 
     def fill(self, color): 
@@ -258,6 +369,15 @@ class Shape(object):
             self.extras["fill-opacity"] = color.alpha/255
         else:
             self.extras["fill-opacity"] = 1.0
+
+    def setFill(self, color):
+        self.fill(color)
+
+    def setOutline(self, color):
+        self.stroke(color)
+
+    def setWidth(self, pixels):
+        self.stroke_width(pixels)
 
     def noFill(self):
         self.extras["fill-opacity"] = 0.0
@@ -291,6 +411,20 @@ class Circle(Shape):
         self.radius = radius
         self.extras = extras
 
+    def getP1(self):
+        """
+        Left, upper point
+        """
+        return Point(self.center[0] - self.radius, 
+                     self.center[1] - self.radius)
+
+    def getP2(self):
+        """
+        Right, lower point
+        """
+        return Point(self.center[0] + self.radius, 
+                     self.center[1] + self.radius)
+
     def __repr__(self):
         return "<Circle %s, r=%s>" % (self.center, self.radius)
 
@@ -298,14 +432,51 @@ class Circle(Shape):
         self.center[:] = center # use directly, no copy
         return self.canvas
 
-    def move(self, delta):
-        self.center[:] = [self.center[0] + delta[0], self.center[1] + delta[1]]
+    def move(self, delta, delta_y=None):
+        if delta_y is None:
+            self.center[:] = [self.center[0] + delta[0], self.center[1] + delta[1]]
+        else:
+            self.center[:] = [self.center[0] + delta, self.center[1] + delta_y]
         return self.canvas
 
     def _add(self, drawing):
-        shape = drawing.circle(center=self.center, r=self.radius, **self.extras)
+        if self.canvas.trans:
+            shape = drawing.ellipse(center=self.t(*self.center), 
+                                    r=(self.tx(self.radius), 
+                                       self.ty(self.radius)), 
+                                    **self.extras)
+        else:
+            shape = drawing.circle(center=self.center, r=self.radius, **self.extras)
         self._apply_matrices(shape, self.matrix)
         drawing.add(shape)
+
+class Point(Circle):
+    def __init__(self, x, y, **extras):
+        super(Point, self).__init__((x, y), 1)
+
+    def __repr__(self):
+        return "<Point (%s,%s)>" % (self.center[0], self.center[1])
+
+    def _add(self, drawing):
+        if self.canvas.trans:
+            shape = drawing.circle(center=self.t(*self.center), r=self.radius, **self.extras)
+        else:
+            shape = drawing.circle(center=self.center, r=self.radius, **self.extras)
+        self._apply_matrices(shape, self.matrix)
+        drawing.add(shape)
+
+    def __getitem__(self, pos):
+        return self.center[pos]
+
+    def __iter__(self):
+        yield self.center[0]
+        yield self.center[1]
+
+    def getX(self):
+        return self.center[0]
+
+    def getY(self):
+        return self.center[1]
 
 class Arc(Shape):
     def __init__(self, center=(0,0), radius=1, start=0, stop=0, **extras):
@@ -315,6 +486,20 @@ class Arc(Shape):
         self.stop = stop
         self.extras = extras
 
+    def getP1(self):
+        """
+        Left, upper point
+        """
+        return Point(self.center[0] - self.radius, 
+                     self.center[1] - self.radius)
+
+    def getP2(self):
+        """
+        Right, lower point
+        """
+        return Point(self.center[0] + self.radius, 
+                     self.center[1] + self.radius)
+
     def __repr__(self):
         return "<Arc %s, r=%s>" % (self.center, self.radius)
 
@@ -322,15 +507,26 @@ class Arc(Shape):
         self.center[:] = center # use directly, no copy
         return self.canvas
 
-    def move(self, delta):
-        self.center[:] = [self.center[0] + delta[0], self.center[1] + delta[1]]
+    def move(self, delta, delta_y=None):
+        if delta_y is None:
+            self.center[:] = [self.center[0] + delta[0], self.center[1] + delta[1]]
+        else:
+            self.center[:] = [self.center[0] + delta, self.center[1] + delta_y]
         return self.canvas
 
     def _add(self, drawing):
         current = self.start
-        points = [(self.center[0], self.center[1])]
+        if self.canvas.trans:
+            points = [self.t(*self.center)]
+        else:
+            points = [(self.center[0], self.center[1])]
         while current < self.stop:
-            points.append(rotate(self.center[0], self.center[1], self.radius, current))
+            if self.canvas.trans:
+                c = self.t(*self.center)
+                # FIXME: allow scale in x and y dimensions:
+                points.append(rotate(c[0], c[1], self.tx(self.radius), current))
+            else:
+                points.append(rotate(self.center[0], self.center[1], self.radius, current))
             current += math.pi/180 * 5.0 # every five degrees
         extras = copy.copy(self.extras)
         extras["stroke-opacity"] = 0.0
@@ -370,13 +566,21 @@ class Line(Shape):
         self.end[:] = self.end[0] + diff_x, self.end[1] + diff_y
         return self.canvas
 
-    def move(self, delta):
-        self.start[:] = self.start[0] + delta[0], self.start[1] + delta[1]
-        self.end[:] = self.end[0] + delta[0], self.end[1] + delta[1]
+    def move(self, delta, delta_y=None):
+        if delta_y is None:
+            self.start[:] = self.start[0] + delta[0], self.start[1] + delta[1]
+            self.end[:] = self.end[0] + delta[0], self.end[1] + delta[1]
+        else:
+            self.start[:] = self.start[0] + delta, self.start[1] + delta_y
+            self.end[:] = self.end[0] + delta, self.end[1] + delta_y
         return self.canvas
 
     def _add(self, drawing):
-        shape = drawing.line(start=self.start, end=self.end, **self.extras)
+        if self.canvas.trans:
+            shape = drawing.line(start=self.t(*self.start), 
+                                 end=self.t(*self.end), **self.extras)
+        else:
+            shape = drawing.line(start=self.start, end=self.end, **self.extras)
         self._apply_matrices(shape, self.matrix)
         drawing.add(shape)
 
@@ -397,12 +601,18 @@ class Text(Shape):
         self.start[:] = start
         return self.canvas
 
-    def move(self, delta):
-        self.start[:] = self.start[0] + delta[0], self.start[1] + delta[1]
+    def move(self, delta, delta_y=None):
+        if delta_y is None:
+            self.start[:] = self.start[0] + delta[0], self.start[1] + delta[1]
+        else:
+            self.start[:] = self.start[0] + delta, self.start[1] + delta_y
         return self.canvas
 
     def _add(self, drawing):
-        shape = drawing.text(text=self.text, insert=self.start, **self.extras)
+        if self.canvas.trans:
+            shape = drawing.text(text=self.text, insert=self.t(*self.start), **self.extras)
+        else:
+            shape = drawing.text(text=self.text, insert=self.start, **self.extras)
         self._apply_matrices(shape, self.matrix)
         drawing.add(shape)
 
@@ -428,12 +638,22 @@ class Rectangle(Shape):
         self.start[:] = start
         return self.canvas
 
-    def move(self, delta):
-        self.start[:] = self.start[0] + delta[0], self.start[1] + delta[1]
+    def move(self, delta, delta_y=None):
+        if delta_y is None:
+            self.start[:] = self.start[0] + delta[0], self.start[1] + delta[1]
+        else:
+            self.start[:] = self.start[0] + delta, self.start[1] + delta_y
         return self.canvas
 
     def _add(self, drawing):
-        shape = drawing.rect(insert=self.start, size=self.size, rx=self.rx, ry=self.ry, **self.extras)
+        if self.canvas.trans:
+            shape = drawing.rect(insert=self.t(*self.start), 
+                                 size=(self.tx(self.size[0]), self.ty(self.size[1])),
+                                 rx=self.rx, 
+                                 ry=self.ry, 
+                                 **self.extras)
+        else:
+            shape = drawing.rect(insert=self.start, size=self.size, rx=self.rx, ry=self.ry, **self.extras)
         self._apply_matrices(shape, self.matrix)
         drawing.add(shape)
 
@@ -453,12 +673,21 @@ class Ellipse(Shape):
         self.center[:] = center # use directly, no copy
         return self.canvas
 
-    def move(self, delta):
-        self.center[:] = [self.center[0] + delta[0], self.center[1] + delta[1]]
+    def move(self, delta, delta_y=None):
+        if delta_y is None:
+            self.center[:] = [self.center[0] + delta[0], self.center[1] + delta[1]]
+        else:
+            self.center[:] = [self.center[0] + delta, self.center[1] + delta_y]
         return self.canvas
 
     def _add(self, drawing):
-        shape = drawing.ellipse(center=self.center, r=self.radii, **self.extras)
+        if self.canvas.trans:
+            shape = drawing.ellipse(center=self.t(*self.center), 
+                                    r=(self.tx(self.radii[0]),
+                                       self.ty(self.radii[1])), 
+                                    **self.extras)
+        else:
+            shape = drawing.ellipse(center=self.center, r=self.radii, **self.extras)
         self._apply_matrices(shape, self.matrix)
         drawing.add(shape)
 
@@ -478,13 +707,19 @@ class Polyline(Shape):
             self.points[i] = self.points[i][0] + diff_x, self.points[i][1] + diff_y
         return self.canvas
 
-    def move(self, delta):
+    def move(self, delta, delta_y=None):
         for i in range(len(self.points)):
-            self.points[i] = self.points[i][0] + delta[0], self.points[i][1] + delta[1]
+            if delta_y is None:
+                self.points[i] = self.points[i][0] + delta[0], self.points[i][1] + delta[1]
+            else:
+                self.points[i] = self.points[i][0] + delta, self.points[i][1] + delta_y
         return self.canvas
 
     def _add(self, drawing):
-        shape = drawing.polyline(points=self.points, **self.extras)
+        if self.canvas.trans:
+            shape = drawing.polyline(points=map(lambda p: self.t(*p), self.points), **self.extras)
+        else:
+            shape = drawing.polyline(points=self.points, **self.extras)
         self._apply_matrices(shape, self.matrix)
         drawing.add(shape)
 
@@ -504,13 +739,19 @@ class Polygon(Shape):
             self.points[i] = self.points[i][0] + diff_x, self.points[i][1] + diff_y
         return self.canvas
 
-    def move(self, delta):
+    def move(self, delta, delta_y=None):
         for i in range(len(self.points)):
-            self.points[i] = self.points[i][0] + delta[0], self.points[i][1] + delta[1]
+            if delta_y is None:
+                self.points[i] = self.points[i][0] + delta[0], self.points[i][1] + delta[1]
+            else:
+                self.points[i] = self.points[i][0] + delta, self.points[i][1] + delta_y
         return self.canvas
 
     def _add(self, drawing):
-        shape = drawing.polygon(points=self.points, **self.extras)
+        if self.canvas.trans:
+            shape = drawing.polygon(points=map(lambda p: self.t(*p), self.points), **self.extras)
+        else:
+            shape = drawing.polygon(points=self.points, **self.extras)
         self._apply_matrices(shape, self.matrix)
         drawing.add(shape)
 
@@ -529,12 +770,20 @@ class Picture(Shape):
         self.start[:] = start
         return self.canvas
 
-    def move(self, delta):
-        self.start[:] = self.start[0] + delta[0], self.start[1] + delta[1]
+    def move(self, delta, delta_y=None):
+        if delta_y is None:
+            self.start[:] = self.start[0] + delta[0], self.start[1] + delta[1]
+        else:
+            self.start[:] = self.start[0] + delta, self.start[1] + delta_y
         return self.canvas
 
     def _add(self, drawing):
-        shape = drawing.image(self.href, insert=self.start, size=self.size, **self.extras)
+        if self.canvas.trans:
+            shape = drawing.image(self.href, 
+                                  insert=self.t(*self.start), 
+                                  size=self.t(*self.size), **self.extras)
+        else:
+            shape = drawing.image(self.href, insert=self.start, size=self.size, **self.extras)
         self._apply_matrices(shape, self.matrix)
         drawing.add(shape)
 
