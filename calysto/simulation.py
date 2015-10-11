@@ -1,5 +1,6 @@
 from calysto.graphics import (Canvas, Polygon, Rectangle, Circle,
                               Color, Line, Ellipse, Arc, Text)
+import numpy as np
 import traceback
 import threading
 import random
@@ -13,6 +14,16 @@ SIMULATION = None
 def rotateAround(x1, y1, length, angle):
     return Point(x1 + length * math.cos(-angle), y1 - length * math.sin(-angle))
 
+def distance(x1, y1, x2, y2):
+    return math.sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2))
+     
+def pdistance(x1, y1, x2, y2, patches_size):
+    pw = patches_size[0]
+    ph = patches_size[1]
+    min_x_diff = min(abs((x1 + pw) - x2), abs(x1 - x2), abs(x1 - (x2 + pw)))
+    min_y_diff = min(abs((y1 + ph) - y2), abs(y1 - y2), abs(y1 - (y2 + ph)))
+    return math.sqrt(min_x_diff ** 2 + min_y_diff ** 2)
+     
 class Point(object):
     def __init__(self, x, y, z=0):
         self.x = x
@@ -51,19 +62,25 @@ class Wall(Drawable):
     """
 
 class Simulation(object):
-    def __init__(self, w, h, *robots):
+    def __init__(self, w, h, *robots, draw_walls=True, background_color=None):
         global SIMULATION
         self.w = w
         self.h = h
+        if background_color:
+            self.background_color = background_color
+        else:
+            self.background_color = Color(0, 128, 0)
         self.scale = 250
         self.at_x = 0
         self.at_y = 0
         self.robots = []
         self.walls = []
-        self.makeWall(0, 0, self.w, 10, Color(128, 0, 128))
-        self.makeWall(0, 0, 10, self.h, Color(128, 0, 128))
-        self.makeWall(0, self.h - 10.0, self.w, self.h, Color(128, 0, 128))
-        self.makeWall(self.w - 10.0, 0.0, 10, self.h, Color(128, 0, 128))
+        self.shapes = []
+        if draw_walls:
+            self.makeWall(0, 0, self.w, 10, Color(128, 0, 128))
+            self.makeWall(0, 0, 10, self.h, Color(128, 0, 128))
+            self.makeWall(0, self.h - 10.0, self.w, self.h, Color(128, 0, 128))
+            self.makeWall(self.w - 10.0, 0.0, 10, self.h, Color(128, 0, 128))
         self.need_to_stop = threading.Event()
         self.is_running = threading.Event()
         self.brain_running = threading.Event()
@@ -119,11 +136,13 @@ class Simulation(object):
     def render(self):
         canvas = Canvas(size=(self.w, self.h))
         rect = Rectangle((self.at_x, self.at_y), (self.w, self.h))
-        rect.fill(Color(0, 128, 0))
+        rect.fill(self.background_color)
         rect.noStroke()
         rect.draw(canvas)
         for wall in self.walls:
             wall.draw(canvas)
+        for shape in self.shapes:
+            shape.draw(canvas)
         for robot in self.robots:
             robot.draw(canvas)
         if self.brain_running.is_set():
@@ -226,6 +245,60 @@ class Simulation(object):
         self.robots.append(robot)
         robot.setSimulation(self)
 
+class DiscreteSimulation(Simulation):
+    def __init__(self, *args, **kwargs):
+        super(DiscreteSimulation, self).__init__(*args, **kwargs)
+        self.pwidth = kwargs.get("pwidth", 10)
+        self.pheight = kwargs.get("pheight", 10)
+        self.psize = (int(self.w/self.pwidth), int(self.h/self.pheight))
+        self.patches = [[None for h in range(self.psize[1])] for w in range(self.psize[0])]
+        self.items = {}
+        self.items["f"] = self.drawFood
+
+    def addCluster(self, cx, cy, item, count, lam_percent=.25):
+        """
+        Add a Poisson cluster of count items around (x,y).
+        """
+        dx, dy = map(lambda v: v * lam_percent, self.psize)
+        total = 0
+        while total < count:
+            points = np.random.poisson(lam=(dx, dy), size=(count, 2))
+            for x, y in points:
+                px, py = (int(x - dx + cx), int(y - dy + cy))
+                if self.getPatch(px, py) is None:
+                    self.setPatch(px, py, item)
+                    total += 1
+                    if total == count:
+                        break
+
+    def setPatch(self, px, py, item):
+        self.patches[int(px) % self.psize[0]][int(py) % self.psize[1]] = item
+
+    def getPatch(self, px, py):
+        return self.patches[px % self.psize[0]][py % self.psize[1]]
+
+    def getPatchLocation(self, px, py):
+        return (px % self.psize[0], py % self.psize[1])
+
+    def render(self):
+        self.shapes.clear()
+        for x in range(0, int(self.w/self.pwidth)):
+            for y in range(0, int(self.h/self.pheight)):
+                if self.patches[x][y] and self.patches[x][y] in self.items:
+                    self.items[self.patches[x][y]](x, y)
+        return super(DiscreteSimulation, self).render()
+
+    def step(self):
+        for robot in random.shuffle(self.robots):
+            robot.runRules()
+
+    def drawFood(self, px, py):
+        center = (px * self.pwidth + self.pwidth/2, 
+                  py * self.pheight + self.pheight/2)
+        food = Circle(center, 5)
+        food.fill("yellow")
+        self.shapes.append(food)
+
 class Hit(object):
     def __init__(self, x, y, distance, color, start_x, start_y):
         self.x = x
@@ -279,7 +352,7 @@ class Robot(object):
         for i in range(len(sx)):
             self.body_points.append(Point(sx[i] * self.simulation.scale, sy[i] * self.simulation.scale))
 
-    ### Movements:
+    ### Continuous Movements:
 
     def sleep(self, seconds):
         self.simulation.sleep(seconds)
@@ -287,6 +360,9 @@ class Robot(object):
             raise KeyboardInterrupt()
 
     def forward(self, seconds, vx=5):
+        """
+        Move continuously in simulator for seconds and velocity vx.
+        """
         self.vx = vx
         self.sleep(seconds)
         self.vx = 0
@@ -410,9 +486,6 @@ class Robot(object):
                     return xy
         return None
     
-    def distance(self, x1, y1, x2, y2):
-        return math.sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2))
-     
     def castRay(self, x1, y1, a, maxRange):
         hits = []
         x2 = math.sin(a) * maxRange + x1
@@ -422,22 +495,22 @@ class Robot(object):
             v1, v2, v3, v4 = wall.points
             pos = self.intersect_hit(x1, y1, x2, y2, v1.x, v1.y, v2.x, v2.y)
             if (pos != None):
-                dist = self.distance(pos[0], pos[1], x1, y1)
+                dist = distance(pos[0], pos[1], x1, y1)
                 hits.append(Hit(pos[0], pos[1], dist, wall.color, x1, y1))
             
             pos = self.intersect_hit(x1, y1, x2, y2, v2.x, v2.y, v3.x, v3.y)
             if (pos != None):
-                dist = self.distance(pos[0], pos[1], x1, y1)
+                dist = distance(pos[0], pos[1], x1, y1)
                 hits.append(Hit(pos[0], pos[1], dist, wall.color, x1, y1))
             
             pos = self.intersect_hit(x1, y1, x2, y2, v3.x, v3.y, v4.x, v4.y)
             if (pos != None):
-                dist = self.distance(pos[0], pos[1], x1, y1)
+                dist = distance(pos[0], pos[1], x1, y1)
                 hits.append(Hit(pos[0], pos[1], dist, wall.color, x1, y1))
             
             pos = self.intersect_hit(x1, y1, x2, y2, v4.x, v4.y, v1.x, v1.y)
             if (pos != None):
-                dist = self.distance(pos[0], pos[1], x1, y1)
+                dist = distance(pos[0], pos[1], x1, y1)
                 hits.append(Hit(pos[0], pos[1], dist, wall.color, x1, y1))
 
         for robot in self.simulation.robots:
@@ -446,22 +519,22 @@ class Robot(object):
             v1, v2, v3, v4 = robot.bounding_box
             pos = self.intersect_hit(x1, y1, x2, y2, v1.x, v1.y, v2.x, v2.y)
             if (pos != None):
-                dist = self.distance(pos[0], pos[1], x1, y1)
+                dist = distance(pos[0], pos[1], x1, y1)
                 hits.append(Hit(pos[0], pos[1], dist, robot.color, x1, y1))
             
             pos = self.intersect_hit(x1, y1, x2, y2, v2.x, v2.y, v3.x, v3.y)
             if (pos != None):
-                dist = self.distance(pos[0], pos[1], x1, y1)
+                dist = distance(pos[0], pos[1], x1, y1)
                 hits.append(Hit(pos[0], pos[1], dist, robot.color, x1, y1))
             
             pos = self.intersect_hit(x1, y1, x2, y2, v3.x, v3.y, v4.x, v4.y)
             if (pos != None):
-                dist = self.distance(pos[0], pos[1], x1, y1)
+                dist = distance(pos[0], pos[1], x1, y1)
                 hits.append(Hit(pos[0], pos[1], dist, robot.color, x1, y1))
             
             pos = self.intersect_hit(x1, y1, x2, y2, v4.x, v4.y, v1.x, v1.y)
             if (pos != None):
-                dist = self.distance(pos[0], pos[1], x1, y1)
+                dist = distance(pos[0], pos[1], x1, y1)
                 hits.append(Hit(pos[0], pos[1], dist, robot.color, x1, y1))
 
         if len(hits) == 0:
@@ -679,7 +752,7 @@ class Robot(object):
         p1 = rotateAround(self.x, self.y, 25/250.0 * scale, self.direction + math.pi/8)
         ## angle of sensor:
         p2 = rotateAround(p1[0], p1[1], self.getIR(0) * self.max_ir * scale, self.direction)
-        dist = self.distance(p1[0], p1[1], p2[0], p2[1])
+        dist = distance(p1[0], p1[1], p2[0], p2[1])
         if (self.getIR(0) < 1.0):
             canvas.stroke(Color(255))
             canvas.fill(Color(128, 0, 128, 64))
@@ -689,13 +762,180 @@ class Robot(object):
         p1 = rotateAround(self.x, self.y, 25/250.0 * scale, self.direction - math.pi/8)
         ## angle of sensor:
         p2 = rotateAround(p1[0], p1[1], self.getIR(1) * self.max_ir * scale, self.direction)
-        dist = self.distance(p1[0], p1[1], p2[0], p2[1])
+        dist = distance(p1[0], p1[1], p2[0], p2[1])
         if (self.getIR(1) < 1.0):
             canvas.stroke(Color(255))
             canvas.noStroke()
             canvas.fill(Color(128, 0, 128, 64))
             arc = Arc((p1[0], p1[1]), dist, self.direction - .5, self.direction + .5)
             arc.draw(canvas)
+
+class PicoLadybug(Robot):
+
+    def __init__(self, *args, **kwargs):
+        super(PicoLadybug, self).__init__(*args, **kwargs)
+        self.energy = kwargs.get("energy", 100)
+        self.block_types = ["b", "x"] ## bugs and walls, block movement
+        self.edible = {"f": 20}
+        self.state = "0"
+
+    def draw_body(self, canvas):
+        px, py = self.x, self.y
+        center = (px * self.simulation.pwidth + self.simulation.pwidth/2, 
+                  py * self.simulation.pheight + self.simulation.pheight/2)
+        ladybug = Circle(center, self.simulation.pwidth)
+        ladybug.fill("red")
+        ladybug.draw(canvas)
+        head = Arc(center, self.simulation.pwidth,  self.direction - math.pi/2, self.direction + math.pi/2)
+        head.fill("black")
+        head.draw(canvas)
+
+    def forward(self, distance):
+        self.move(distance, 0)
+
+    def backward(self, distance):
+        self.move(-distance, 0)
+
+    def turnLeft(self, angle):
+        self.direction -= angle * math.pi/180
+        
+    def stop(self):
+        self.energy -= 0.75
+
+    def turnRight(self, angle):
+        self.direction += angle * math.pi/180
+        # 90 degree == 1 unit
+        self.energy -= angle/360 * 4.0
+        
+    def move(self, dx, dy):
+        x = dx * math.sin(-self.direction + math.pi/2) + dy * math.cos(-self.direction + math.pi/2)
+        y = dx * math.cos(-self.direction + math.pi/2) - dy * math.sin(-self.direction + math.pi/2)
+        # check to see if move is possible:
+        px, py = self.simulation.getPatchLocation(int(self.x + x), int(self.y + y))
+        # update energy (even if agent was unable to move):
+        # distance of 1 is 1 unit of energy:
+        self.energy -= pdistance(self.x, self.y, px, py, self.simulation.psize)
+        spot = self.simulation.patches[px][py]
+        # if can move, make move:
+        if spot is None or spot not in self.block_types:
+            # if food, eat it:
+            if spot in self.edible:
+                self.energy += self.edible[spot]
+            # move into:
+            self.simulation.patches[px][py] = 'b'
+            # Move out of:
+            self.simulation.setPatch(int(self.x), int(self.y), None)
+            # Update location:
+            self.x, self.y = px, py
+
+    def parseRule(self, srule):
+        parts = []
+        args = []
+        current = ""
+        state = "begin"
+        for s in srule:
+            if state == "begin":
+                if s == "#" and current == "" and len(parts) == 0:
+                    return None
+                if s in [" ", "\n", "\t"]: # whitespace
+                    if current:
+                        parts.append(current)
+                        current = ""
+                elif s == "(": # args
+                    state = "args"
+                    if current:
+                        parts.append(current)
+                        current = ""
+                else:
+                    current += s
+            elif state == "args":
+                if s in [" ", "\n", "\t"]: # whitespace
+                    if current:
+                        args.append(current)
+                        current = ""
+                elif s == ")": # args
+                    state = "begin"
+                    if current:
+                        args.append(current)
+                        current = ""
+                elif s == ",": # args
+                    if current:
+                        args.append(current)
+                        current = ""
+                else:
+                    current += s
+        if current:
+            parts.append(current)
+        parts.insert(-1, args)
+        # state, match, "->", action, args, state
+        if len(parts) == 1 and len(args) == 0:
+            return None
+        elif len(parts) != 6:
+            raise Exception("Invalid length of rule in '%s'" % srule)
+        elif parts[2] != "->":
+            raise Exception("Item #3 should be => in '%s'" % srule)
+        return parts
+
+    def applyAction(self, command, args):
+        if command == "turnLeft":
+            if args[0] not in ["45", "90", "135", "180"]:
+                raise Exception("Invalid angle: must be 45, 90, 135, or 180")
+            self.turnLeft(float(args[0]))
+        elif command == "turnRight":
+            if args[0] not in ["45", "90", "135", "180"]:
+                raise Exception("Invalid angle: must be 45, 90, 135, or 180")
+            self.turnRight(float(args[0]))
+        elif command == "forward":
+            if not (1 <= float(args[0]) <= 9):
+                raise Exception("Invalid distance: must be >= 1 or <= 9")
+            self.forward(float(args[0]))
+        elif command == "backward":
+            if not (1 <= float(args[0]) <= 9):
+                raise Exception("Invalid distance: must be >= 1 or <= 9")
+            self.backward(float(args[0]))
+        elif command == "stop":
+            self.stop()
+
+    def runRules(self):
+        firedRule = False
+        rules = self.rules.strip()
+        rules = rules.split("\n")
+        if len(rules) == 0:
+            raise Exception("Need at least one rule")
+        for rule in rules:
+            # state, match, "->", action, args, state
+            # match fff, *f*, f**, **f, no rule match, no movement
+            parts = self.parseRule(rule)
+            if parts:
+                state, match, arrow, action, args, next_state = parts
+                sense = self.getSenses()
+                if self.state == state and self.match(match, sense):
+                    print("rule matched:", rule)
+                    self.applyAction(action, args)
+                    self.state = next_state
+                    firedRule = True
+                    break
+        if not firedRule:
+            raise Exception("No rule matched")
+
+    def getSenses(self):
+        senses = []
+        # dx: forward/backward; dy: left/right
+        for dx,dy in [[0, 1], [1, 1], [1, 0], [1, -1], [0, -1]]:
+            x = dx * math.sin(-self.direction + math.pi/2) + dy * math.cos(-self.direction + math.pi/2)
+            y = dx * math.cos(-self.direction + math.pi/2) - dy * math.sin(-self.direction + math.pi/2)
+            item = self.simulation.getPatch(int(self.x + x), int(self.y + y))
+            senses.append(item)
+        return senses
+
+    def match(self, rule, world):
+        print("match:", rule, world)
+        if len(rule) != len(world):
+            raise Exception("Matching part requires 5 characters: '%s'" % rule)
+        for w,r in zip(world, rule):
+            if w != r and r != "*":
+                return False
+        return True
 
 class LadyBug(Robot):
     def draw_body(self, canvas):
@@ -796,6 +1036,46 @@ def loadSimulation(sim_filename):
         sys.path.append(sim_folder)
     mod = __import__(sim_filename)
     return mod.makeSimulation()
+
+def PicoView(sim_file):
+    try:
+        from ipywidgets import widgets
+    except:
+        from IPython.html import widgets
+
+    def restart(x, y, direction):
+        simulation.reset()
+        canvas.value = str(simulation.render())
+
+    canvas = widgets.HTML()
+    go_button = widgets.Button(description="Go")
+    stop_button = widgets.Button(description="Stop")
+    step_button = widgets.Button(description="Step")
+    reset_button = widgets.Button(description="Reset")
+    gui_button = widgets.IntSlider(description="GUI Update Interval", min=1, max=10, value=5)
+    error = widgets.HTML("")
+
+    simulation = loadSimulation(sim_filename)
+    simulation.start_sim(gui=False, set_value=canvas, error=error)
+
+    canvas.value = str(simulation.render())
+
+    sim_widgets = widgets.VBox([canvas, 
+                                gui_button,
+                                widgets.HBox([stop_sim_button, 
+                                              #stop_button, 
+                                              restart_button,
+                                              #pause_button,
+                                              ]),
+                                error])
+
+    stop_button.on_click(stop_and_start)
+    stop_sim_button.on_click(lambda obj: simulation.stop_sim())
+    restart_button.on_click(lambda obj: restart(550, 350, -math.pi/2))
+    pause_button.on_click(toggle_pause)
+    gui_button.on_trait_change(lambda *args: simulation.set_gui_update(gui_button.value), "value")
+
+    return sim_widgets
 
 def View(sim_filename):
     try:
