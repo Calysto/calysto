@@ -62,8 +62,10 @@ class Wall(Drawable):
     """
 
 class Simulation(object):
-    def __init__(self, w, h, *robots, draw_walls=True, background_color=None):
+    def __init__(self, w, h, *robots, **kwargs):
         global SIMULATION
+        background_color = kwargs.get("background_color", None)
+        draw_walls = kwargs.get("draw_walls", True)
         self.w = w
         self.h = h
         if background_color:
