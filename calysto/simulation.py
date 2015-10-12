@@ -97,6 +97,7 @@ class Simulation(object):
         SIMULATION = self
 
     def reset(self):
+        self.clock = 0.0
         for robot in self.robots:
             robot.stop()
             robot.x = robot.ox
@@ -110,7 +111,6 @@ class Simulation(object):
         Run the simulation in the background, showing the GUI by default.
         """
         self.error = error
-        self.clock = 0.0
         if not self.is_running.is_set():
             def loop():
                 self.need_to_stop.clear()
@@ -253,9 +253,21 @@ class DiscreteSimulation(Simulation):
         self.pwidth = kwargs.get("pwidth", 10)
         self.pheight = kwargs.get("pheight", 10)
         self.psize = (int(self.w/self.pwidth), int(self.h/self.pheight))
-        self.patches = [[None for h in range(self.psize[1])] for w in range(self.psize[0])]
         self.items = {}
         self.items["f"] = self.drawFood
+        self.initialize()
+        self.gui_update = 1 
+
+    def initialize(self):
+        self.patches = [[None for h in range(self.psize[1])] for w in range(self.psize[0])]
+
+    def reset(self):
+        for robot in self.robots:
+            robot.stop()
+            robot.x = robot.ox
+            robot.y = robot.oy
+            robot.direction = robot.odirection
+            robot.energy = robot.oenergy
 
     def addCluster(self, cx, cy, item, count, lam_percent=.25):
         """
@@ -290,15 +302,18 @@ class DiscreteSimulation(Simulation):
                     self.items[self.patches[x][y]](x, y)
         return super(DiscreteSimulation, self).render()
 
-    def step(self):
-        for robot in random.shuffle(self.robots):
-            robot.runRules()
-
     def drawFood(self, px, py):
         center = (px * self.pwidth + self.pwidth/2, 
                   py * self.pheight + self.pheight/2)
         food = Circle(center, 5)
         food.fill("yellow")
+        self.shapes.append(food)
+
+    def drawWall(self, px, py):
+        center = (px * self.pwidth + self.pwidth/2, 
+                  py * self.pheight + self.pheight/2)
+        food = Circle(center, 5)
+        food.fill("purple")
         self.shapes.append(food)
 
 class Hit(object):
@@ -772,14 +787,15 @@ class Robot(object):
             arc = Arc((p1[0], p1[1]), dist, self.direction - .5, self.direction + .5)
             arc.draw(canvas)
 
-class PicoLadybug(Robot):
-
+class DiscreteLadybug(Robot):
     def __init__(self, *args, **kwargs):
-        super(PicoLadybug, self).__init__(*args, **kwargs)
+        super(DiscreteLadybug, self).__init__(*args, **kwargs)
         self.energy = kwargs.get("energy", 100)
-        self.block_types = ["b", "x"] ## bugs and walls, block movement
+        self.oenergy = self.energy
+        self.block_types = ["b", "w"] ## bugs and walls, block movement
         self.edible = {"f": 20}
         self.state = "0"
+        self.rules = None
 
     def draw_body(self, canvas):
         px, py = self.x, self.y
@@ -800,7 +816,9 @@ class PicoLadybug(Robot):
 
     def turnLeft(self, angle):
         self.direction -= angle * math.pi/180
-        
+        self.energy -= angle/360 * 4.0
+        self.direction = self.direction % (math.pi * 2.0)
+
     def stop(self):
         self.energy -= 0.75
 
@@ -808,6 +826,7 @@ class PicoLadybug(Robot):
         self.direction += angle * math.pi/180
         # 90 degree == 1 unit
         self.energy -= angle/360 * 4.0
+        self.direction = self.direction % (math.pi * 2.0)
         
     def move(self, dx, dy):
         x = dx * math.sin(-self.direction + math.pi/2) + dy * math.cos(-self.direction + math.pi/2)
@@ -898,7 +917,9 @@ class PicoLadybug(Robot):
         elif command == "stop":
             self.stop()
 
-    def runRules(self):
+    def update(self):
+        if self.rules is None:
+            return
         firedRule = False
         rules = self.rules.strip()
         rules = rules.split("\n")
@@ -912,7 +933,6 @@ class PicoLadybug(Robot):
                 state, match, arrow, action, args, next_state = parts
                 sense = self.getSenses()
                 if self.state == state and self.match(match, sense):
-                    print("rule matched:", rule)
                     self.applyAction(action, args)
                     self.state = next_state
                     firedRule = True
@@ -931,7 +951,6 @@ class PicoLadybug(Robot):
         return senses
 
     def match(self, rule, world):
-        print("match:", rule, world)
         if len(rule) != len(world):
             raise Exception("Matching part requires 5 characters: '%s'" % rule)
         for w,r in zip(world, rule):
@@ -1039,14 +1058,29 @@ def loadSimulation(sim_filename):
     mod = __import__(sim_filename)
     return mod.makeSimulation()
 
-def PicoView(sim_file):
+def DiscreteView(sim_filename):
     try:
         from ipywidgets import widgets
     except:
         from IPython.html import widgets
 
-    def restart(x, y, direction):
-        simulation.reset()
+    def go(obj):
+        simulation.start_sim(gui=False, set_value=canvas, error=error)
+
+    def stop(obj):
+        simulation.stop_sim()
+
+    def step(obj):
+        simulation.clock += simulation.sim_time
+        for robot in simulation.robots:
+            robot.update()
+        canvas.value = str(simulation.render())
+        energy_widget.value = str(robot.energy)
+
+    def reset(obj):
+        simulation.clock = 0.0
+        simulation.stop_sim()
+        simulation.initialize()
         canvas.value = str(simulation.render())
 
     canvas = widgets.HTML()
@@ -1054,29 +1088,25 @@ def PicoView(sim_file):
     stop_button = widgets.Button(description="Stop")
     step_button = widgets.Button(description="Step")
     reset_button = widgets.Button(description="Reset")
-    gui_button = widgets.IntSlider(description="GUI Update Interval", min=1, max=10, value=5)
     error = widgets.HTML("")
-
     simulation = loadSimulation(sim_filename)
-    simulation.start_sim(gui=False, set_value=canvas, error=error)
-
+    simulation.sim_time = 0.2
+    robot = get_robot()
     canvas.value = str(simulation.render())
-
+    energy_widget = widgets.Text(str(robot.energy))
+    energy_widget.disabled = True
     sim_widgets = widgets.VBox([canvas, 
-                                gui_button,
-                                widgets.HBox([stop_sim_button, 
-                                              #stop_button, 
-                                              restart_button,
-                                              #pause_button,
+                                widgets.HBox([go_button, 
+                                              stop_button, 
+                                              step_button,
+                                              reset_button,
+                                              energy_widget,
                                               ]),
                                 error])
-
-    stop_button.on_click(stop_and_start)
-    stop_sim_button.on_click(lambda obj: simulation.stop_sim())
-    restart_button.on_click(lambda obj: restart(550, 350, -math.pi/2))
-    pause_button.on_click(toggle_pause)
-    gui_button.on_trait_change(lambda *args: simulation.set_gui_update(gui_button.value), "value")
-
+    go_button.on_click(go)
+    stop_button.on_click(stop)
+    step_button.on_click(step)
+    reset_button.on_click(reset)
     return sim_widgets
 
 def View(sim_filename):
