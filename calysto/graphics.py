@@ -8,11 +8,11 @@ GPL (http://www.gnu.org/licenses/gpl.html).
 
 __all__ = [
     # The container:
-    'Canvas', 
+    'Canvas',
     # Shapes:
-    'Shape', 'Line', 'Circle', 'Text', 'Rectangle', 
+    'Shape', 'Line', 'Circle', 'Text', 'Rectangle',
     'Ellipse', 'Polyline', 'Polygon', 'Picture', 'Arc',
-    'BarChart', 'Point', 
+    'BarChart', 'Point', 'Turtle',
     # Pixel-based items:
     'Pixel', 'Color',
     # Units:
@@ -25,10 +25,14 @@ import cairosvg
 import numpy
 import math
 import copy
+import io
 from cairosvg.parser import Tree
 
 def rotate(x, y, length, radians):
     return (x + length * math.cos(-radians), y - length * math.sin(-radians))
+
+def distance(p1, p2):
+    return math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
 
 class Transform:
     """
@@ -44,13 +48,13 @@ class Transform:
         self.ybase = yhigh
         self.xscale = xspan/float(w-1)
         self.yscale = yspan/float(h-1)
-        
+
     def screen(self,x,y):
         # Returns x,y in screen (actually window) coordinates
         xs = (x-self.xbase) / self.xscale
         ys = (self.ybase-y) / self.yscale
         return int(xs+0.5),int(ys+0.5)
-        
+
     def world(self,xs,ys):
         # Returns xs,ys in world coordinates
         x = xs*self.xscale + self.xbase
@@ -77,10 +81,14 @@ class Canvas(object):
     def __repr__(self):
         return "<Canvas %s>" % str(self.size)
 
-    def _render(self):
+    def _render(self, **attribs):
         drawing = svgwrite.Drawing(self.filename, self.size, **self.extras)
         if self._viewbox:
             drawing.viewbox(*self._viewbox)
+        for key in attribs:
+            drawing.attribs[key] = attribs[key]
+        for shape in self.shapes:
+            shape._add(drawing)
         return drawing
 
     def setCoords(self, x1, y1, x2, y2):
@@ -93,13 +101,13 @@ class Canvas(object):
             return self.trans.screen(x,y)
         else:
             return x,y
-                      
+
     def toWorld(self, x, y):
         if self.trans:
             return self.trans.world(x,y)
         else:
             return x,y
-        
+
     def toScaleX(self, v):
         if self.trans:
             return v/self.trans.xscale
@@ -159,8 +167,8 @@ class Canvas(object):
     def viewbox(self, xmin, ymin, width, height):
         self._viewbox = (xmin, ymin, width, height)
 
-    def save(self, filename=None):
-        drawing = self._render()
+    def save(self, filename=None, **attribs):
+        drawing = self._render(**attribs)
         if filename:
             drawing.saveas(filename)
         else:
@@ -189,18 +197,14 @@ class Canvas(object):
 
     def undraw(self, shape):
         shape.canvas = None
-        del self.shapes[shape]
+        del self.shapes[self.shapes.index(shape)]
         return self
 
     def get_html(self, **attribs):
         return self._repr_svg_(**attribs)
 
     def _repr_svg_(self, **attribs):
-        drawing = self._render()
-        for key in attribs:
-            drawing.attribs[key] = attribs[key]
-        for shape in self.shapes:
-            shape._add(drawing)
+        drawing = self._render(**attribs)
         return drawing.tostring()
 
     def _repr_png_(self):
@@ -212,10 +216,34 @@ class Canvas(object):
     def convert(self, format="png", **kwargs):
         """
         png, ps, pdf, gif, jpg, svg
-        returns image in format as string
+        returns image in format as bytes
         """
         surface = cairosvg.SURFACES[format.upper()]
         return surface.convert(bytestring=str(self), **kwargs)
+
+    def toPIL(self):
+        """
+        Convert canvas to a PIL image
+        """
+        import PIL.Image
+
+        png = self._repr_png_()
+        sfile = io.BytesIO(png)
+        pil = PIL.Image.open(sfile)
+        background = PIL.Image.new('RGBA', pil.size, (255, 255, 255))
+        # Paste the image on top of the background
+        background.paste(pil, pil)
+        im = background.convert('RGB').convert('P', palette=PIL.Image.ADAPTIVE)
+        return im
+
+    def toGIF(self):
+        """
+        Convert canvas to GIF bytes
+        """
+        im = self.toPIL()
+        sfile = io.BytesIO()
+        im.save(sfile, format="gif")
+        return sfile.getvalue()
 
     def toArray(self, dpi=96, **kwargs):
         """
@@ -230,6 +258,15 @@ class Canvas(object):
         array = numpy.frombuffer(buffer, numpy.uint8)
         array.shape = (width, height, 4) # 4 = rgb + alpha
         return array
+
+    def start_movie(self):
+        self.frames = []
+
+    def frame(self):
+        self.frames.append(self.toGIF())
+
+    def save_movie(self):
+        pass
 
     def getPixels(self):
         """
@@ -316,12 +353,6 @@ class Shape(object):
         canvas.draw(self)
         return canvas
 
-    def undraw(self):
-        del self.canvas.shapes[self]
-        self.canvas = None
-        self.t = self.tx = self.ty = None
-        return self
-
     def clone(self):
         """
         """
@@ -345,9 +376,10 @@ class Shape(object):
         else:
             raise Exception("invalid transform: " + transform)
 
-    def undraw(self, canvas):
-        canvas.undraw(self)
-        return canvas
+    def undraw(self):
+        self.canvas.undraw(self)
+        self.canvas = None
+        self.t = self.tx = self.ty = None
 
     def forward(self, distance):
         start = self.center[:]
@@ -357,13 +389,13 @@ class Shape(object):
             Line(start, self.center, **self.extras).draw(self.canvas)
             return self.canvas
 
-    def turn(self, degrees): 
+    def turn(self, degrees):
         """
-        Turn the shape direction by these degrees. 
+        Turn the shape direction by these degrees.
         """
         self.direction -= (math.pi / 180.0) * degrees
 
-    def fill(self, color): 
+    def fill(self, color):
         self.extras["fill"] = str(color)
         if isinstance(color, Color):
             self.extras["fill-opacity"] = color.alpha/255
@@ -385,26 +417,26 @@ class Shape(object):
     def noStroke(self):
         self.extras["stroke-opacity"] = 0.0
 
-    def stroke(self, color): 
+    def stroke(self, color):
         self.extras["stroke"] = str(color)
         if isinstance(color, Color):
             self.extras["stroke-opacity"] = color.alpha/255
         else:
             self.extras["stroke-opacity"] = 1.0
 
-    def stroke_width(self, width): 
+    def stroke_width(self, width):
         self.extras["stroke-width"] = width
 
     def moveToTop(self):
         self.canvas.shapes.remove(self)
         self.canvas.shapes.append(self)
         return self.canvas
-        
+
     def moveToBottom(self):
         self.canvas.shapes.remove(self)
         self.canvas.shapes.insert(0, self)
         return self.canvas
-        
+
 class Circle(Shape):
     def __init__(self, center=(0,0), radius=1, **extras):
         super(Circle, self).__init__(center)
@@ -415,14 +447,14 @@ class Circle(Shape):
         """
         Left, upper point
         """
-        return Point(self.center[0] - self.radius, 
+        return Point(self.center[0] - self.radius,
                      self.center[1] - self.radius)
 
     def getP2(self):
         """
         Right, lower point
         """
-        return Point(self.center[0] + self.radius, 
+        return Point(self.center[0] + self.radius,
                      self.center[1] + self.radius)
 
     def __repr__(self):
@@ -441,9 +473,9 @@ class Circle(Shape):
 
     def _add(self, drawing):
         if self.canvas.trans:
-            shape = drawing.ellipse(center=self.t(*self.center), 
-                                    r=(self.tx(self.radius), 
-                                       self.ty(self.radius)), 
+            shape = drawing.ellipse(center=self.t(*self.center),
+                                    r=(self.tx(self.radius),
+                                       self.ty(self.radius)),
                                     **self.extras)
         else:
             shape = drawing.circle(center=self.center, r=self.radius, **self.extras)
@@ -490,14 +522,14 @@ class Arc(Shape):
         """
         Left, upper point
         """
-        return Point(self.center[0] - self.radius, 
+        return Point(self.center[0] - self.radius,
                      self.center[1] - self.radius)
 
     def getP2(self):
         """
         Right, lower point
         """
-        return Point(self.center[0] + self.radius, 
+        return Point(self.center[0] + self.radius,
                      self.center[1] + self.radius)
 
     def __repr__(self):
@@ -577,12 +609,83 @@ class Line(Shape):
 
     def _add(self, drawing):
         if self.canvas.trans:
-            shape = drawing.line(start=self.t(*self.start), 
+            shape = drawing.line(start=self.t(*self.start),
                                  end=self.t(*self.end), **self.extras)
         else:
             shape = drawing.line(start=self.start, end=self.end, **self.extras)
         self._apply_matrices(shape, self.matrix)
         drawing.add(shape)
+
+class Turtle(object):
+    def __init__(self, canvas, center, angle=0):
+        self.canvas = canvas
+        self.x = center[0]
+        self.y = center[1]
+        self.angle = angle * math.pi/180.0
+        self.angle_units = "degrees"
+        self.pen = "down"
+        self.fill_color = Color(128, 0, 128)
+        self.stroke = Color(0, 0, 0)
+        self.stroke_width = 1
+        self.fill_opacity = None
+        self.stroke_opacity = None
+        self.arrow = None
+        self.draw_arrow()
+
+
+    def draw_arrow(self):
+        if self.arrow:
+            self.arrow.undraw()
+        self.canvas.pushMatrix()
+        self.arrow = Polygon([(-10,   5),
+                              (  0,   0),
+                              (-10,  -5),
+                              ( -5,   0)])
+        self.canvas.translate(self.x, self.y)
+        self.canvas.rotate(self.angle)
+        self.arrow.draw(self.canvas)
+        self.canvas.popMatrix()
+
+    def forward(self, distance):
+        new_x, new_y = rotate(self.x, self.y, distance, self.angle)
+        if self.pen == "down":
+            line = Line((self.x, self.y), (new_x, new_y),
+                        **{"stroke": self.stroke,
+                           "stroke-width": self.stroke_width})
+            line.draw(self.canvas)
+        self.x, self.y = new_x, new_y
+        self.draw_arrow()
+        return self.canvas
+
+    def backward(self, distance):
+        return self.forward(-distance)
+
+    def left(self, angle):
+        return self.right(-angle)
+
+    def right(self, angle):
+        if self.angle_units == "degrees":
+            angle = angle * math.pi/180
+        self.angle += angle
+        self.angle = self.angle % (math.pi * 2)
+        self.draw_arrow()
+        return self.canvas
+
+    def goto(self, new_x, new_y):
+        if self.pen == "down":
+            line = Line((self.x, self.y), (new_x, new_y),
+                        **{"stroke": self.stroke,
+                           "stroke-width": self.stroke_width})
+            line.draw(self.canvas)
+        self.x, self.y = new_x, new_y
+        self.draw_arrow()
+        return self.canvas
+
+    def penup(self):
+        self.pen = "up"
+
+    def pendown(self):
+        self.pen = "down"
 
 class Text(Shape):
     def __init__(self, text="", start=(0,0), **extras):
@@ -647,10 +750,10 @@ class Rectangle(Shape):
 
     def _add(self, drawing):
         if self.canvas.trans:
-            shape = drawing.rect(insert=self.t(*self.start), 
+            shape = drawing.rect(insert=self.t(*self.start),
                                  size=(self.tx(self.size[0]), self.ty(self.size[1])),
-                                 rx=self.rx, 
-                                 ry=self.ry, 
+                                 rx=self.rx,
+                                 ry=self.ry,
                                  **self.extras)
         else:
             shape = drawing.rect(insert=self.start, size=self.size, rx=self.rx, ry=self.ry, **self.extras)
@@ -682,9 +785,9 @@ class Ellipse(Shape):
 
     def _add(self, drawing):
         if self.canvas.trans:
-            shape = drawing.ellipse(center=self.t(*self.center), 
+            shape = drawing.ellipse(center=self.t(*self.center),
                                     r=(self.tx(self.radii[0]),
-                                       self.ty(self.radii[1])), 
+                                       self.ty(self.radii[1])),
                                     **self.extras)
         else:
             shape = drawing.ellipse(center=self.center, r=self.radii, **self.extras)
@@ -779,8 +882,8 @@ class Picture(Shape):
 
     def _add(self, drawing):
         if self.canvas.trans:
-            shape = drawing.image(self.href, 
-                                  insert=self.t(*self.start), 
+            shape = drawing.image(self.href,
+                                  insert=self.t(*self.start),
                                   size=self.t(*self.size), **self.extras)
         else:
             shape = drawing.image(self.href, insert=self.start, size=self.size, **self.extras)
@@ -796,9 +899,9 @@ class Plot(Canvas):
         self.frame_size = 20
         self.x_offset = 20
         ## (upper left, width, height)
-        self.plot_boundaries = [self.frame_size + self.x_offset, 
+        self.plot_boundaries = [self.frame_size + self.x_offset,
                                 self.frame_size,
-                                self.size[0] - 2 * self.frame_size - self.x_offset, 
+                                self.size[0] - 2 * self.frame_size - self.x_offset,
                                 self.size[1] - 2 * self.frame_size]
         self.plot_width = self.plot_boundaries[2] - self.plot_boundaries[0]
         self.plot_height = self.plot_boundaries[3] - self.plot_boundaries[1]
@@ -823,8 +926,8 @@ class BarChart(Plot):
         count = 0
         for item in self.data:
             self.draw( Rectangle((start_x + self.bar_width * count,
-                                  start_y - item/max_count * self.plot_height), 
-                                 (self.bar_width * 0.75, 
+                                  start_y - item/max_count * self.plot_height),
+                                 (self.bar_width * 0.75,
                                   item/max_count * self.plot_height)))
             count += 1
         # X legend:

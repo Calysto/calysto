@@ -16,14 +16,14 @@ def rotateAround(x1, y1, length, angle):
 
 def distance(x1, y1, x2, y2):
     return math.sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2))
-     
+
 def pdistance(x1, y1, x2, y2, patches_size):
     pw = patches_size[0]
     ph = patches_size[1]
     min_x_diff = min(abs((x1 + pw) - x2), abs(x1 - x2), abs(x1 - (x2 + pw)))
     min_y_diff = min(abs((y1 + ph) - y2), abs(y1 - y2), abs(y1 - (y2 + ph)))
     return math.sqrt(min_x_diff ** 2 + min_y_diff ** 2)
-     
+
 class Point(object):
     def __init__(self, x, y, z=0):
         self.x = x
@@ -106,7 +106,7 @@ class Simulation(object):
             if robot.brain:
                 self.runBrain(robot.brain)
 
-    def start_sim(self, gui=True, set_value=None, error=None):
+    def start_sim(self, gui=True, set_values={}, error=None):
         """
         Run the simulation in the background, showing the GUI by default.
         """
@@ -123,13 +123,26 @@ class Simulation(object):
                     if not self.paused.is_set():
                         self.clock += self.sim_time
                         for robot in self.robots:
-                            robot.update()
+                            try:
+                                robot.update()
+                            except Exception as exc:
+                                self.need_to_stop.set()
+                                if error:
+                                    error.value = "Error: %s. Now stopping simulation." % str(exc)
+                                else:
+                                    raise
                     if gui:
                         self.draw()
-                    if set_value and count % self.gui_update == 0:
-                        set_value.value = str(self.render())
+                    if count % self.gui_update == 0:
+                        if "canvas" in set_values:
+                            set_values["canvas"].value = str(self.render())
+                        if "energy" in set_values:
+                            if len(self.robots) > 0:
+                                set_values["energy"].value = str(self.robots[0].energy)
                     count += 1
                     self.realsleep(self.sim_time)
+                    if self.robots[0].energy <= 0:
+                        self.need_to_stop.set()
                 self.is_running.clear()
                 for robot in self.robots:
                     robot.stop()
@@ -149,9 +162,9 @@ class Simulation(object):
             robot.draw(canvas)
         if self.brain_running.is_set():
             if not self.paused.is_set():
-                state = "Brain Running..." 
+                state = "Brain Running..."
             else:
-                state = "Brain paused!" 
+                state = "Brain paused!"
         else:
             if not self.paused.is_set():
                 state = "Idle"
@@ -198,7 +211,7 @@ class Simulation(object):
         Sleep in simulated time.
         """
         start = self.time()
-        while (self.time() - start < seconds and 
+        while (self.time() - start < seconds and
                not self.need_to_stop.is_set()):
             self.need_to_stop.wait(self.sim_time)
 
@@ -232,17 +245,17 @@ class Simulation(object):
         wall = Wall([Point(x, y),
                      Point(x + w, y),
                      Point(x + w, y + h),
-                     Point(x, y + h)], 
+                     Point(x, y + h)],
                     color)
         self.walls.append(wall)
 
     def set_gui_update(self, value):
         self.gui_update = value
-        
+
     def setScale(self, s):
         ## scale the world... > 1 make it bigger
         self.scale = s * 250
-      
+
     def addRobot(self, robot):
         self.robots.append(robot)
         robot.setSimulation(self)
@@ -256,7 +269,7 @@ class DiscreteSimulation(Simulation):
         self.items = {}
         self.items["f"] = self.drawFood
         self.initialize()
-        self.gui_update = 1 
+        self.gui_update = 1
 
     def initialize(self):
         self.patches = [[None for h in range(self.psize[1])] for w in range(self.psize[0])]
@@ -268,6 +281,7 @@ class DiscreteSimulation(Simulation):
             robot.y = robot.oy
             robot.direction = robot.odirection
             robot.energy = robot.oenergy
+            robot.history = [robot.energy]
 
     def addCluster(self, cx, cy, item, count, lam_percent=.25):
         """
@@ -303,14 +317,14 @@ class DiscreteSimulation(Simulation):
         return super(DiscreteSimulation, self).render()
 
     def drawFood(self, px, py):
-        center = (px * self.pwidth + self.pwidth/2, 
+        center = (px * self.pwidth + self.pwidth/2,
                   py * self.pheight + self.pheight/2)
         food = Circle(center, 5)
         food.fill("yellow")
         self.shapes.append(food)
 
     def drawWall(self, px, py):
-        center = (px * self.pwidth + self.pwidth/2, 
+        center = (px * self.pwidth + self.pwidth/2,
                   py * self.pheight + self.pheight/2)
         food = Circle(center, 5)
         food.fill("purple")
@@ -339,7 +353,7 @@ class Robot(object):
         self.vx = 0.0 ## velocity in x direction
         self.vy = 0.0 ## velocity in y direction
         self.va = 0.0 ## turn velocity
-        ## sensors 
+        ## sensors
         self.stalled = False
         self.bounding_box = [Point(0, 0)] * 4
         self.color = Color(255, 0, 0)
@@ -358,12 +372,12 @@ class Robot(object):
 
     def setSimulation(self, simulation):
         self.simulation = simulation
-        sx = [0.05, 0.05, 0.07, 0.07, 0.09, 0.09, 0.07, 
-              0.07, 0.05, 0.05, -0.05, -0.05, -0.07, 
-              -0.08, -0.09, -0.09, -0.08, -0.07, -0.05, 
+        sx = [0.05, 0.05, 0.07, 0.07, 0.09, 0.09, 0.07,
+              0.07, 0.05, 0.05, -0.05, -0.05, -0.07,
+              -0.08, -0.09, -0.09, -0.08, -0.07, -0.05,
               -0.05]
-        sy = [0.06, 0.08, 0.07, 0.06, 0.06, -0.06, -0.06, 
-              -0.07, -0.08, -0.06, -0.06, -0.08, -0.07, 
+        sy = [0.06, 0.08, 0.07, 0.06, 0.06, -0.06, -0.06,
+              -0.07, -0.08, -0.06, -0.06, -0.08, -0.07,
               -0.06, -0.05, 0.05, 0.06, 0.07, 0.08, 0.06]
         self.body_points = []
         for i in range(len(sx)):
@@ -383,32 +397,34 @@ class Robot(object):
         self.vx = vx
         self.sleep(seconds)
         self.vx = 0
-    
+
     def backward(self, seconds, vx=5):
         self.vx = -vx
         self.sleep(seconds)
         self.vx = 0
-    
+
     def turnLeft(self, seconds, va=math.pi/180):
         self.va = va * 4
         self.sleep(seconds)
         self.va = 0
-    
+
     def turnRight(self, seconds, va=math.pi/180):
         self.va = -va * 4
         self.sleep(seconds)
         self.va = 0
-    
+
     def getIR(self, pos=None):
         ## 0 is on right, front
         ## 1 is on left, front
         if pos is None:
             return [self.getIR(0), self.getIR(1)]
-        elif (self.ir_sensors[pos] != None):
-            return self.ir_sensors[pos].distance / (self.max_ir * self.simulation.scale)
         else:
-            return 1.0
-    
+            hit = self.ir_sensors[pos]
+            if (hit is not None):
+                return hit.distance / (self.max_ir * self.simulation.scale)
+            else:
+                return 1.0
+
     def takePicture(self):
         self.picture_ready.clear()
         self.take_picture.set()
@@ -449,21 +465,21 @@ class Robot(object):
             raise KeyboardInterrupt()
         self.take_picture.clear()
         return pic
-    
+
     def stop(self):
         self.vx = 0.0
         self.vy = 0.0
         self.va = 0.0
-    
+
     def ccw(self, ax, ay, bx, by, cx, cy):
         ## counter clockwise
         return (((cy - ay) * (bx - ax)) > ((by - ay) * (cx - ax)))
-    
+
     def intersect(self, ax, ay, bx, by, cx, cy, dx, dy):
         ## Return True if line segments AB and CD intersect
-        return (self.ccw(ax, ay, cx, cy, dx, dy) != self.ccw(bx, by, cx, cy, dx, dy) and 
+        return (self.ccw(ax, ay, cx, cy, dx, dy) != self.ccw(bx, by, cx, cy, dx, dy) and
                 self.ccw(ax, ay, bx, by, cx, cy) != self.ccw(ax, ay, bx, by, dx, dy))
-    
+
     def coefs(self, p1x, p1y, p2x, p2y):
         A = (p1y - p2y)
         B = (p2x - p1x)
@@ -480,7 +496,7 @@ class Robot(object):
             return [x1, y1]
         else:
             return None
-        
+
     def intersect_hit(self, p1x, p1y, p2x, p2y, p3x, p3y, p4x, p4y):
         ## http:##stackoverflow.com/questions/20677795/find-the-point-of-intersecting-lines
         L1 = self.coefs(p1x, p1y, p2x, p2y)
@@ -492,17 +508,17 @@ class Robot(object):
             highx = max(p1x, p2x) + .1
             lowy = min(p1y, p2y) - .1
             highy = max(p1y, p2y) + .1
-            if (lowx <= xy[0] and xy[0] <= highx and 
+            if (lowx <= xy[0] and xy[0] <= highx and
                 lowy <= xy[1] and xy[1] <= highy):
                 lowx = min(p3x, p4x) - .1
                 highx = max(p3x, p4x) + .1
                 lowy = min(p3y, p4y) - .1
                 highy = max(p3y, p4y) + .1
-                if (lowx <= xy[0] and xy[0] <= highx and 
+                if (lowx <= xy[0] and xy[0] <= highx and
                     lowy <= xy[1] and xy[1] <= highy):
                     return xy
         return None
-    
+
     def castRay(self, x1, y1, a, maxRange):
         hits = []
         x2 = math.sin(a) * maxRange + x1
@@ -514,17 +530,17 @@ class Robot(object):
             if (pos != None):
                 dist = distance(pos[0], pos[1], x1, y1)
                 hits.append(Hit(pos[0], pos[1], dist, wall.color, x1, y1))
-            
+
             pos = self.intersect_hit(x1, y1, x2, y2, v2.x, v2.y, v3.x, v3.y)
             if (pos != None):
                 dist = distance(pos[0], pos[1], x1, y1)
                 hits.append(Hit(pos[0], pos[1], dist, wall.color, x1, y1))
-            
+
             pos = self.intersect_hit(x1, y1, x2, y2, v3.x, v3.y, v4.x, v4.y)
             if (pos != None):
                 dist = distance(pos[0], pos[1], x1, y1)
                 hits.append(Hit(pos[0], pos[1], dist, wall.color, x1, y1))
-            
+
             pos = self.intersect_hit(x1, y1, x2, y2, v4.x, v4.y, v1.x, v1.y)
             if (pos != None):
                 dist = distance(pos[0], pos[1], x1, y1)
@@ -538,17 +554,17 @@ class Robot(object):
             if (pos != None):
                 dist = distance(pos[0], pos[1], x1, y1)
                 hits.append(Hit(pos[0], pos[1], dist, robot.color, x1, y1))
-            
+
             pos = self.intersect_hit(x1, y1, x2, y2, v2.x, v2.y, v3.x, v3.y)
             if (pos != None):
                 dist = distance(pos[0], pos[1], x1, y1)
                 hits.append(Hit(pos[0], pos[1], dist, robot.color, x1, y1))
-            
+
             pos = self.intersect_hit(x1, y1, x2, y2, v3.x, v3.y, v4.x, v4.y)
             if (pos != None):
                 dist = distance(pos[0], pos[1], x1, y1)
                 hits.append(Hit(pos[0], pos[1], dist, robot.color, x1, y1))
-            
+
             pos = self.intersect_hit(x1, y1, x2, y2, v4.x, v4.y, v1.x, v1.y)
             if (pos != None):
                 dist = distance(pos[0], pos[1], x1, y1)
@@ -558,14 +574,14 @@ class Robot(object):
             return None
         else:
             return self.min_hits(hits)
-    
+
     def min_hits(self, hits):
         minimum = hits[0]
         for hit in hits:
             if (hit.distance < minimum.distance):
                 minimum = hit
         return minimum
-    
+
     def check_for_stall(self, px, py, pdirection):
         scale = self.simulation.scale
         p1 = rotateAround(px, py, 30/250.0 * scale, pdirection + math.pi/4 + 0 * math.pi/2)
@@ -579,44 +595,44 @@ class Robot(object):
             v3 = wall.points[2]
             v4 = wall.points[3]
             ## p1 to p2
-            if (self.intersect(p1[0], p1[1], p2[0], p2[1],     
+            if (self.intersect(p1[0], p1[1], p2[0], p2[1],
                                v1.x, v1.y, v2.x, v2.y) or
-                self.intersect(p1[0], p1[1], p2[0], p2[1], 
+                self.intersect(p1[0], p1[1], p2[0], p2[1],
                                v2.x, v2.y, v3.x, v3.y) or
-                self.intersect(p1[0], p1[1], p2[0], p2[1], 
+                self.intersect(p1[0], p1[1], p2[0], p2[1],
                                v3.x, v3.y, v4.x, v4.y) or
-                self.intersect(p1[0], p1[1], p2[0], p2[1], 
+                self.intersect(p1[0], p1[1], p2[0], p2[1],
                                v4.x, v4.y, v1.x, v1.y) or
                 ## p2 to p3
-                self.intersect(p2[0], p2[1], p3[0], p3[1], 
+                self.intersect(p2[0], p2[1], p3[0], p3[1],
                                v1.x, v1.y, v2.x, v2.y) or
-                self.intersect(p2[0], p2[1], p3[0], p3[1], 
+                self.intersect(p2[0], p2[1], p3[0], p3[1],
                                v2.x, v2.y, v3.x, v3.y) or
-                self.intersect(p2[0], p2[1], p3[0], p3[1], 
+                self.intersect(p2[0], p2[1], p3[0], p3[1],
                                v3.x, v3.y, v4.x, v4.y) or
-                self.intersect(p2[0], p2[1], p3[0], p3[1], 
+                self.intersect(p2[0], p2[1], p3[0], p3[1],
                                v4.x, v4.y, v1.x, v1.y) or
                 ## p3 to p4
-                self.intersect(p3[0], p3[1], p4[0], p4[1], 
+                self.intersect(p3[0], p3[1], p4[0], p4[1],
                                v1.x, v1.y, v2.x, v2.y) or
-                self.intersect(p3[0], p3[1], p4[0], p4[1], 
+                self.intersect(p3[0], p3[1], p4[0], p4[1],
                                v2.x, v2.y, v3.x, v3.y) or
-                self.intersect(p3[0], p3[1], p4[0], p4[1], 
+                self.intersect(p3[0], p3[1], p4[0], p4[1],
                                v3.x, v3.y, v4.x, v4.y) or
-                self.intersect(p3[0], p3[1], p4[0], p4[1], 
+                self.intersect(p3[0], p3[1], p4[0], p4[1],
                                v4.x, v4.y, v1.x, v1.y) or
                 ## p4 to p1
-                self.intersect(p4[0], p4[1], p1[0], p1[1], 
+                self.intersect(p4[0], p4[1], p1[0], p1[1],
                                v1.x, v1.y, v2.x, v2.y) or
-                self.intersect(p4[0], p4[1], p1[0], p1[1], 
+                self.intersect(p4[0], p4[1], p1[0], p1[1],
                                v2.x, v2.y, v3.x, v3.y) or
-                self.intersect(p4[0], p4[1], p1[0], p1[1], 
+                self.intersect(p4[0], p4[1], p1[0], p1[1],
                                v3.x, v3.y, v4.x, v4.y) or
-                self.intersect(p4[0], p4[1], p1[0], p1[1], 
+                self.intersect(p4[0], p4[1], p1[0], p1[1],
                                v4.x, v4.y, v1.x, v1.y)):
                 self.stalled = True
                 break
-                
+
         if not self.stalled:
             # keep checking for obstacles:
             for robot in self.simulation.robots:
@@ -624,40 +640,40 @@ class Robot(object):
                     continue
                 v1, v2, v3, v4 = robot.bounding_box
                 ## p1 to p2
-                if (self.intersect(p1[0], p1[1], p2[0], p2[1],     
+                if (self.intersect(p1[0], p1[1], p2[0], p2[1],
                                    v1.x, v1.y, v2.x, v2.y) or
-                    self.intersect(p1[0], p1[1], p2[0], p2[1], 
+                    self.intersect(p1[0], p1[1], p2[0], p2[1],
                                    v2.x, v2.y, v3.x, v3.y) or
-                    self.intersect(p1[0], p1[1], p2[0], p2[1], 
+                    self.intersect(p1[0], p1[1], p2[0], p2[1],
                                    v3.x, v3.y, v4.x, v4.y) or
-                    self.intersect(p1[0], p1[1], p2[0], p2[1], 
+                    self.intersect(p1[0], p1[1], p2[0], p2[1],
                                    v4.x, v4.y, v1.x, v1.y) or
                     ## p2 to p3
-                    self.intersect(p2[0], p2[1], p3[0], p3[1], 
+                    self.intersect(p2[0], p2[1], p3[0], p3[1],
                                    v1.x, v1.y, v2.x, v2.y) or
-                    self.intersect(p2[0], p2[1], p3[0], p3[1], 
+                    self.intersect(p2[0], p2[1], p3[0], p3[1],
                                    v2.x, v2.y, v3.x, v3.y) or
-                    self.intersect(p2[0], p2[1], p3[0], p3[1], 
+                    self.intersect(p2[0], p2[1], p3[0], p3[1],
                                    v3.x, v3.y, v4.x, v4.y) or
-                    self.intersect(p2[0], p2[1], p3[0], p3[1], 
+                    self.intersect(p2[0], p2[1], p3[0], p3[1],
                                    v4.x, v4.y, v1.x, v1.y) or
                     ## p3 to p4
-                    self.intersect(p3[0], p3[1], p4[0], p4[1], 
+                    self.intersect(p3[0], p3[1], p4[0], p4[1],
                                    v1.x, v1.y, v2.x, v2.y) or
-                    self.intersect(p3[0], p3[1], p4[0], p4[1], 
+                    self.intersect(p3[0], p3[1], p4[0], p4[1],
                                    v2.x, v2.y, v3.x, v3.y) or
-                    self.intersect(p3[0], p3[1], p4[0], p4[1], 
+                    self.intersect(p3[0], p3[1], p4[0], p4[1],
                                    v3.x, v3.y, v4.x, v4.y) or
-                    self.intersect(p3[0], p3[1], p4[0], p4[1], 
+                    self.intersect(p3[0], p3[1], p4[0], p4[1],
                                    v4.x, v4.y, v1.x, v1.y) or
                     ## p4 to p1
-                    self.intersect(p4[0], p4[1], p1[0], p1[1], 
+                    self.intersect(p4[0], p4[1], p1[0], p1[1],
                                    v1.x, v1.y, v2.x, v2.y) or
-                    self.intersect(p4[0], p4[1], p1[0], p1[1], 
+                    self.intersect(p4[0], p4[1], p1[0], p1[1],
                                    v2.x, v2.y, v3.x, v3.y) or
-                    self.intersect(p4[0], p4[1], p1[0], p1[1], 
+                    self.intersect(p4[0], p4[1], p1[0], p1[1],
                                    v3.x, v3.y, v4.x, v4.y) or
-                    self.intersect(p4[0], p4[1], p1[0], p1[1], 
+                    self.intersect(p4[0], p4[1], p1[0], p1[1],
                                    v4.x, v4.y, v1.x, v1.y)):
                     self.stalled = True
                     break
@@ -673,36 +689,36 @@ class Robot(object):
         ## proposed positions:
         self.stalled = False
         if (self.vx != 0 or self.vy != 0 or self.va != 0):
-            px = self.x + tvx/250.0 * scale 
-            py = self.y + tvy/250.0 * scale 
-            pdirection = self.direction - self.va 
+            px = self.x + tvx/250.0 * scale
+            py = self.y + tvy/250.0 * scale
+            pdirection = self.direction - self.va
             pbox = self.check_for_stall(px, py, pdirection)
             if (not self.stalled):
                 ## if no intersection, make move
-                self.x = px 
-                self.y = py 
-                self.direction = pdirection 
+                self.x = px
+                self.y = py
+                self.direction = pdirection
                 self.bounding_box = pbox
             else:
                 self.direction += self.bump_variability()
-        
+
         ## update sensors, camera:
         ## on right:
         p = rotateAround(self.x, self.y, 25/250.0 * scale, self.direction + math.pi/8)
         hit = self.castRay(p[0], p[1], -self.direction + math.pi/2.0, self.max_ir * scale)
         self.ir_sensors[0] = hit
-        
+
         p = rotateAround(self.x, self.y, 25/250.0 * scale, self.direction - math.pi/8)
         hit = self.castRay(p[0], p[1], -self.direction + math.pi/2, self.max_ir * scale)
         self.ir_sensors[1] = hit
-        
+
         ## camera:
         if self.take_picture.is_set():
             for i in range(256):
-                angle = i/256.0 * 60 - 30    
+                angle = i/256.0 * 60 - 30
                 self.camera[i] = self.castRay(self.x, self.y, -self.direction + math.pi/2.0 - angle*math.pi/180.0, 1000)
             self.picture_ready.set()
-         
+
     def draw(self, canvas):
         scale = self.simulation.scale
         if self.debug:
@@ -714,7 +730,7 @@ class Robot(object):
                          Line((p4[0], p4[1]), (p1[0], p1[1]))]:
                 line.stroke(Color(255, 255, 255))
                 line.draw(canvas)
-        
+
             for hit, offset in zip(self.ir_sensors, [math.pi/8, -math.pi/8]):
                 if hit:
                     # FIXME: offset should be part ofsensor:
@@ -792,6 +808,7 @@ class DiscreteLadybug(Robot):
         super(DiscreteLadybug, self).__init__(*args, **kwargs)
         self.energy = kwargs.get("energy", 100)
         self.oenergy = self.energy
+        self.history = [self.energy]
         self.block_types = ["b", "w"] ## bugs and walls, block movement
         self.edible = {"f": 20}
         self.state = "0"
@@ -799,7 +816,7 @@ class DiscreteLadybug(Robot):
 
     def draw_body(self, canvas):
         px, py = self.x, self.y
-        center = (px * self.simulation.pwidth + self.simulation.pwidth/2, 
+        center = (px * self.simulation.pwidth + self.simulation.pwidth/2,
                   py * self.simulation.pheight + self.simulation.pheight/2)
         ladybug = Circle(center, self.simulation.pwidth)
         ladybug.fill("red")
@@ -814,40 +831,56 @@ class DiscreteLadybug(Robot):
     def backward(self, distance):
         self.move(-distance, 0)
 
+    def set_energy(self, energy):
+        self.energy = energy
+        self.history.append(self.energy)
+
     def turnLeft(self, angle):
         self.direction -= angle * math.pi/180
-        self.energy -= angle/360 * 4.0
+        self.set_energy(self.energy - angle/360 * 4.0)
         self.direction = self.direction % (math.pi * 2.0)
 
     def stop(self):
-        self.energy -= 0.75
+        #self.energy -= 0.75
+        pass
 
     def turnRight(self, angle):
         self.direction += angle * math.pi/180
         # 90 degree == 1 unit
-        self.energy -= angle/360 * 4.0
+        self.set_energy(self.energy - angle/360 * 4.0)
         self.direction = self.direction % (math.pi * 2.0)
-        
-    def move(self, dx, dy):
-        x = dx * math.sin(-self.direction + math.pi/2) + dy * math.cos(-self.direction + math.pi/2)
-        y = dx * math.cos(-self.direction + math.pi/2) - dy * math.sin(-self.direction + math.pi/2)
-        # check to see if move is possible:
-        px, py = self.simulation.getPatchLocation(int(self.x + x), int(self.y + y))
-        # update energy (even if agent was unable to move):
-        # distance of 1 is 1 unit of energy:
-        self.energy -= pdistance(self.x, self.y, px, py, self.simulation.psize)
-        spot = self.simulation.patches[px][py]
-        # if can move, make move:
-        if spot is None or spot not in self.block_types:
-            # if food, eat it:
-            if spot in self.edible:
-                self.energy += self.edible[spot]
-            # move into:
-            self.simulation.patches[px][py] = 'b'
-            # Move out of:
-            self.simulation.setPatch(int(self.x), int(self.y), None)
-            # Update location:
-            self.x, self.y = px, py
+
+    def sign(self, value):
+        if value == 0:
+            return 0
+        elif value < 0:
+            return -1
+        elif value > 0:
+            return 1
+
+    def move(self, tx, ty):
+        for step in range(int(max(abs(tx), abs(ty)))):
+            dx = self.sign(tx)
+            dy = self.sign(ty)
+            x = dx * math.sin(-self.direction + math.pi/2) + dy * math.cos(-self.direction + math.pi/2)
+            y = dx * math.cos(-self.direction + math.pi/2) - dy * math.sin(-self.direction + math.pi/2)
+            # check to see if move is possible:
+            px, py = self.simulation.getPatchLocation(int(self.x + x), int(self.y + y))
+            # update energy (even if agent was unable to move):
+            # distance of 1 is 1 unit of energy:
+            self.set_energy(self.energy - pdistance(self.x, self.y, px, py, self.simulation.psize))
+            spot = self.simulation.patches[px][py]
+            # if can move, make move:
+            if spot is None or spot not in self.block_types:
+                # if food, eat it:
+                if spot in self.edible:
+                    self.set_energy(self.energy + self.edible[spot])
+                # move into:
+                self.simulation.patches[px][py] = 'b'
+                # Move out of:
+                self.simulation.setPatch(int(self.x), int(self.y), None)
+                # Update location:
+                self.x, self.y = px, py
 
     def parseRule(self, srule):
         parts = []
@@ -899,12 +932,12 @@ class DiscreteLadybug(Robot):
 
     def applyAction(self, command, args):
         if command == "turnLeft":
-            if args[0] not in ["45", "90", "135", "180"]:
-                raise Exception("Invalid angle: must be 45, 90, 135, or 180")
+            if args[0] not in ["90", "180"]:
+                raise Exception("Invalid angle: must be 90 or 180")
             self.turnLeft(float(args[0]))
         elif command == "turnRight":
-            if args[0] not in ["45", "90", "135", "180"]:
-                raise Exception("Invalid angle: must be 45, 90, 135, or 180")
+            if args[0] not in ["90", "180"]:
+                raise Exception("Invalid angle: must be 90 or 180")
             self.turnRight(float(args[0]))
         elif command == "forward":
             if not (1 <= float(args[0]) <= 9):
@@ -919,12 +952,14 @@ class DiscreteLadybug(Robot):
 
     def update(self):
         if self.rules is None:
+            self.set_energy(self.energy - 0.75) # cost of being alive
             return
         firedRule = False
         rules = self.rules.strip()
         rules = rules.split("\n")
         if len(rules) == 0:
             raise Exception("Need at least one rule")
+        ox, oy = self.x, self.y
         for rule in rules:
             # state, match, "->", action, args, state
             # match fff, *f*, f**, **f, no rule match, no movement
@@ -937,17 +972,24 @@ class DiscreteLadybug(Robot):
                     self.state = next_state
                     firedRule = True
                     break
+        if (ox, oy) == (self.x, self.y):
+            self.set_energy(self.energy - 0.75) # cost of being alive
         if not firedRule:
             raise Exception("No rule matched")
 
     def getSenses(self):
         senses = []
+        #self.positions = []
         # dx: forward/backward; dy: left/right
+
+
         for dx,dy in [[0, 1], [1, 1], [1, 0], [1, -1], [0, -1]]:
+        #for dx,dy in [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1]]:
             x = dx * math.sin(-self.direction + math.pi/2) + dy * math.cos(-self.direction + math.pi/2)
             y = dx * math.cos(-self.direction + math.pi/2) - dy * math.sin(-self.direction + math.pi/2)
-            item = self.simulation.getPatch(int(self.x + x), int(self.y + y))
+            item = self.simulation.getPatch(round(self.x + x), round(self.y + y))
             senses.append(item)
+            #self.positions.append((round(self.x + x), round(self.y + y)))
         return senses
 
     def match(self, rule, world):
@@ -987,7 +1029,7 @@ class LadyBug(Robot):
         head.draw(canvas)
         line = Line((width/1.5, 0), (-width/1.5, 0))
         line.draw(canvas)
-        for x,y in [(length/5, width/5), (0, width/10), 
+        for x,y in [(length/5, width/5), (0, width/10),
                     (-length/5, -width/3), (length/5, -width/5),
                     (-length/4, width/4)]:
             spot = Ellipse((x, y), (length/20, length/20))
@@ -1002,6 +1044,11 @@ class LadyBug(Robot):
         canvas.popMatrix()
 
 class Spider(Robot):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.max_ir = 1/2 # ratio of robot
+
     def bump_variability(self):
         return 0.0
 
@@ -1058,56 +1105,66 @@ def loadSimulation(sim_filename):
     mod = __import__(sim_filename)
     return mod.makeSimulation()
 
-def DiscreteView(sim_filename):
-    try:
+class DiscreteView(object):
+    def __init__(self, sim_filename):
         from ipywidgets import widgets
-    except:
-        from IPython.html import widgets
+        self.sim_filename = sim_filename
+        self.canvas = widgets.HTML()
+        self.go_button = widgets.Button(description="Go")
+        self.stop_button = widgets.Button(description="Stop")
+        self.step_button = widgets.Button(description="Step")
+        self.reset_button = widgets.Button(description="Restart")
+        self.error = widgets.HTML("")
+        self.simulation = loadSimulation(self.sim_filename)
+        self.simulation.sim_time = 0.2
+        self.canvas.value = str(self.simulation.render())
+        self.energy_widget = widgets.Text(str(self.simulation.robots[0].energy))
+        #self.energy_widget.disabled = True
+        self.sim_widgets = widgets.VBox([self.canvas,
+                                    widgets.HBox([self.go_button,
+                                                  self.stop_button,
+                                                  self.step_button,
+                                                  self.reset_button,
+                                                  self.energy_widget,
+                                                  ]),
+                                    self.error])
+        self.go_button.on_click(self.go)
+        self.stop_button.on_click(self.stop)
+        self.step_button.on_click(self.step)
+        self.reset_button.on_click(self.reset)
 
-    def go(obj):
-        simulation.start_sim(gui=False, set_value=canvas, error=error)
+    def go(self, obj):
+        self.simulation.start_sim(gui=False, set_values={"canvas": self.canvas,
+                                                         "energy": self.energy_widget},
+                                  error=self.error)
 
-    def stop(obj):
-        simulation.stop_sim()
+    def stop(self, obj=None):
+        self.simulation.stop_sim()
 
-    def step(obj):
-        simulation.clock += simulation.sim_time
-        for robot in simulation.robots:
+    def step(self, obj=None):
+        self.simulation.clock += self.simulation.sim_time
+        for robot in self.simulation.robots:
             robot.update()
-        canvas.value = str(simulation.render())
-        energy_widget.value = str(robot.energy)
+        self.canvas.value = str(self.simulation.render())
+        self.energy_widget.value = str(self.simulation.robots[0].energy)
 
-    def reset(obj):
-        simulation.clock = 0.0
-        simulation.stop_sim()
-        simulation.initialize()
-        canvas.value = str(simulation.render())
+    def reset(self, obj=None):
+        self.simulation.clock = 0.0
+        self.simulation.stop_sim()
+        self.simulation.initialize()
+        self.canvas.value = str(self.simulation.render())
+        self.energy_widget.value = str(self.simulation.robots[0].energy)
 
-    canvas = widgets.HTML()
-    go_button = widgets.Button(description="Go")
-    stop_button = widgets.Button(description="Stop")
-    step_button = widgets.Button(description="Step")
-    reset_button = widgets.Button(description="Reset")
-    error = widgets.HTML("")
-    simulation = loadSimulation(sim_filename)
-    simulation.sim_time = 0.2
-    robot = get_robot()
-    canvas.value = str(simulation.render())
-    energy_widget = widgets.Text(str(robot.energy))
-    energy_widget.disabled = True
-    sim_widgets = widgets.VBox([canvas, 
-                                widgets.HBox([go_button, 
-                                              stop_button, 
-                                              step_button,
-                                              reset_button,
-                                              energy_widget,
-                                              ]),
-                                error])
-    go_button.on_click(go)
-    stop_button.on_click(stop)
-    step_button.on_click(step)
-    reset_button.on_click(reset)
-    return sim_widgets
+    def setRobot(self, pos, robot):
+        self.simulation.robots[pos] = robot
+
+    def addCluster(self, x, y, item, count):
+        self.simulation.addCluster(x, y, item, count)
+
+    def render(self):
+        return self.simulation.render()
+
+    clock = property(lambda self: self.simulation.clock)
 
 def View(sim_filename):
     try:
@@ -1115,17 +1172,23 @@ def View(sim_filename):
     except:
         from IPython.html import widgets
 
+    def stop_sim(obj):
+        simulation.stop_sim()
+        pause_button.visible = False
+
     def restart(x, y, direction):
         simulation.stop_sim()
         time.sleep(.250)
         simulation.reset()
         canvas.value = str(simulation.render())
-        simulation.start_sim(gui=False, set_value=canvas, error=error)
+        simulation.start_sim(gui=False, set_values={"canvas": canvas}, error=error)
+        pause_button.visible = True
 
     def stop_and_start(obj):
         simulation.stop_sim()
         time.sleep(.250)
-        simulation.start_sim(gui=False, set_value=canvas, error=error)
+        simulation.start_sim(gui=False, set_values={"canvas": canvas}, error=error)
+        pause_button.visible = True
 
     def toggle_pause(obj):
         if simulation.paused.is_set():
@@ -1136,7 +1199,7 @@ def View(sim_filename):
             pause_button.description = "Resume Simulation"
 
     canvas = widgets.HTML()
-    stop_button = widgets.Button(description="Stop Brain")
+    #stop_button = widgets.Button(description="Stop Brain")
     stop_sim_button = widgets.Button(description="Stop Simulation")
     restart_button = widgets.Button(description="Restart Simulation")
     pause_button = widgets.Button(description="Pause Simulation")
@@ -1144,23 +1207,120 @@ def View(sim_filename):
     error = widgets.HTML("")
 
     simulation = loadSimulation(sim_filename)
-    simulation.start_sim(gui=False, set_value=canvas, error=error)
+    simulation.start_sim(gui=False, set_values={"canvas": canvas}, error=error)
+    #simulation.stop_sim()
 
     canvas.value = str(simulation.render())
 
-    sim_widgets = widgets.VBox([canvas, 
+    sim_widgets = widgets.VBox([canvas,
                                 gui_button,
-                                widgets.HBox([stop_sim_button, 
-                                              #stop_button, 
+                                widgets.HBox([stop_sim_button,
+                                              #stop_button,
                                               restart_button,
-                                              #pause_button,
+                                              pause_button,
                                               ]),
                                 error])
 
+
     stop_button.on_click(stop_and_start)
-    stop_sim_button.on_click(lambda obj: simulation.stop_sim())
+    stop_sim_button.on_click(stop_sim)
     restart_button.on_click(lambda obj: restart(550, 350, -math.pi/2))
     pause_button.on_click(toggle_pause)
     gui_button.on_trait_change(lambda *args: simulation.set_gui_update(gui_button.value), "value")
 
     return sim_widgets
+
+class DNARobot(object):
+    def __init__(self, robot, dna=None):
+        from calysto.ai import conx
+        self.clen = 3
+        self.net = conx.SRN(verbosity=-1)
+        self.net.addSRNLayers(5, 3, 1)
+        self.dna_length = len(self.net.arrayify() * self.clen)
+        self.robot = robot
+        if dna is None:
+            self.dna = self.make_dna(self.dna_length)
+        else:
+            self.dna = dna
+        self.net.unArrayify(self.make_array_from_dna(self.dna))
+        self.net["context"].setActivations([.25, .25, .25])
+
+    def codon2weight(self, codon):
+        """
+        Turn a codon of "000" to "999" to a number between
+        -5.0 and 5.0.
+        """
+        length = len(codon)
+        retval = int(codon)
+        return retval/(10 ** (length - 1)) - 5.0
+
+    def weight2codon(self, weight, length=None):
+        """
+        Given a weight between -5 and 5, turn it into
+        a codon, eg "000" to "999"
+        """
+        if length is None:
+            length = self.clen
+        retval = 0
+        weight = min(max(weight + 5.0, 0), 10.0) * (10 ** (length - 1))
+        for i in range(length):
+            if i == length - 1: # last one
+                d = int(round(weight / (10 ** (length - i - 1))))
+            else:
+                d = int(weight / (10 ** (length - i - 1)))
+            weight = weight % (10 ** (length - i - 1))
+            retval += d * (10 ** (length - i - 1))
+        return ("%0" + str(length) + "d") % retval
+
+    def make_dna(self, length=None):
+        import random
+        if length is None:
+            length = self.dna_length
+        return "".join([random.choice("0123456789") for i in range(length)])
+
+    def make_array_from_dna(self, dna):
+        array = []
+        for i in range(0, len(dna), self.clen):
+            codon = dna[i:i+self.clen]
+            array.append(self.codon2weight(codon))
+        return array
+
+    def draw(self, canvas):
+        self.robot.draw(canvas)
+
+    def stop(self):
+        self.robot.stop()
+
+    def update(self):
+        def sense2num(s):
+            if s == 'w':
+                return 0.75
+            elif s == None:
+                return 0.5
+            else:
+                return 0.25
+        senses = self.robot.getSenses()
+        fsenses = list(map(sense2num, senses))
+        v = self.net.propagate(input=fsenses)
+        self.net.postBackprop()
+        if v[0] < .33:
+            self.robot.turnLeft(90)
+        elif v[0] < .66:
+            self.robot.forward(1)
+        else:
+            self.robot.turnRight(90)
+
+    x = property(lambda self: self.robot.x,
+                lambda self, value: setattr(self.robot, "x", value))
+    y = property(lambda self: self.robot.y,
+                lambda self, value: setattr(self.robot, "y", value))
+    direction = property(lambda self: self.robot.direction,
+                        lambda self, value: setattr(self.robot, "direction", value))
+    energy = property(lambda self: self.robot.energy,
+                      lambda self, value: setattr(self.robot, "energy", value))
+    ox = property(lambda self: self.robot.ox)
+    oy = property(lambda self: self.robot.oy)
+    odirection = property(lambda self: self.robot.odirection)
+    oenergy = property(lambda self: self.robot.oenergy)
+    history = property(lambda self: self.robot.history,
+                      lambda self, value: setattr(self.robot, "history", value))
