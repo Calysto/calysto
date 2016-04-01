@@ -107,17 +107,41 @@ class GraphWin(Canvas):
 class Text(_CText):
     def __init__(self, center, text, **extras):
         super(Text, self).__init__(text, 
-                                   (center[0] - len(text) * 3.5, 
-                                    center[1] + 10), **extras)
+                                     (center[0] - len(text) * 3.5, 
+                                      center[1] + 10), **extras)
 
 class Rectangle(_CRectangle):
     def __init__(self, start, stop, **extras):
         super(Rectangle, self).__init__(
-            (start[0],           start[1] - (start[1] - stop[1])), 
-            (stop[0] - start[0], start[1] - stop[1]), 
+            (start[0],           start[1]), 
+            (stop[0] - start[0], stop[1] - start[1]), 
             **extras)
+        self.noFill()
 
 class Oval(_CEllipse):
     """
     """
+    def __init__(self, start, stop, **extras):
+        super(Oval, self).__init__(
+            (start[0] + (stop[0] + start[0])/2, 
+             start[1] + (stop[1] - start[1])/2), 
+            ((stop[0] - start[0])/2, 
+             (stop[1] - start[1])/2), 
+            **extras)
+        self.noFill()
+
+class Circle(_CCircle):
+    """
+    """
+    def __init__(self, center, radius, **kwargs):
+        super(Circle, self).__init__((center[0], center[1]), 
+                                     radius=radius, **kwargs)
+        self.noFill()
+
+class Line(_CLine):
+    """
+    """
+    def __init__(self, *args, **kwargs):
+        super(Line, self).__init__(*args, **kwargs)
+        self.noFill()
 

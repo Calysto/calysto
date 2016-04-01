@@ -201,6 +201,9 @@ class Canvas(object):
         return self
 
     def get_html(self, **attribs):
+        if "onClick" in attribs:
+            onClick = attribs["onClick"]
+            del attribs["onClick"]
         return self._repr_svg_(**attribs)
 
     def _repr_svg_(self, **attribs):
