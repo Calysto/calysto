@@ -3,14 +3,14 @@ from calysto.graphics import (Canvas, Color, Pixel, Point)
 from ipywidgets import widgets
 import time
 
-from calysto.graphics import (Text      as _CText, 
+from calysto.graphics import (Text      as _CText,
                               Rectangle as _CRectangle,
                               Ellipse   as _CEllipse,
-                              Line      as _CLine, 
-                              Polyline  as _CPolyline, 
-                              Polygon   as _CPolygon, 
-                              Picture   as _CPicture, 
-                              Arc       as _CArc, 
+                              Line      as _CLine,
+                              Polyline  as _CPolyline,
+                              Polygon   as _CPolygon,
+                              Picture   as _CPicture,
+                              Arc       as _CArc,
                               Circle    as _CCircle)
 
 class GraphWin(Canvas):
@@ -24,7 +24,7 @@ class GraphWin(Canvas):
         self.mouse_y = widgets.IntText()
         self.svg_canvas = widgets.HTML(
             self.get_html(onClick="window.clicked(evt, '%s', '%s')" % (self.mouse_x.model_id, self.mouse_y.model_id)))
-        self.window = widgets.HBox([self.title, 
+        self.window = widgets.HBox([self.title,
                                     self.svg_canvas])
         display(Javascript("""
         window.clicked = function (evt, x_model, y_model) {
@@ -43,7 +43,7 @@ class GraphWin(Canvas):
                 model.set('value', Math.round(y));
                 model.save_changes();
             });
-        };  
+        };
         """))
         display(self.window)
 
@@ -106,15 +106,15 @@ class GraphWin(Canvas):
 
 class Text(_CText):
     def __init__(self, center, text, **extras):
-        super(Text, self).__init__(text, 
-                                     (center[0] - len(text) * 3.5, 
+        super(Text, self).__init__(text,
+                                     (center[0] - len(text) * 3.5,
                                       center[1] + 10), **extras)
 
 class Rectangle(_CRectangle):
     def __init__(self, start, stop, **extras):
         super(Rectangle, self).__init__(
-            (start[0],           start[1]), 
-            (stop[0] - start[0], stop[1] - start[1]), 
+            (start[0],           start[1]),
+            (stop[0] - start[0], stop[1] - start[1]),
             **extras)
         self.noFill()
 
@@ -123,10 +123,10 @@ class Oval(_CEllipse):
     """
     def __init__(self, start, stop, **extras):
         super(Oval, self).__init__(
-            (start[0] + (stop[0] + start[0])/2, 
-             start[1] + (stop[1] - start[1])/2), 
-            ((stop[0] - start[0])/2, 
-             (stop[1] - start[1])/2), 
+            (start[0] + (stop[0] + start[0])/2,
+             start[1] + (stop[1] - start[1])/2),
+            ((stop[0] - start[0])/2,
+             (stop[1] - start[1])/2),
             **extras)
         self.noFill()
 
@@ -134,7 +134,7 @@ class Circle(_CCircle):
     """
     """
     def __init__(self, center, radius, **kwargs):
-        super(Circle, self).__init__((center[0], center[1]), 
+        super(Circle, self).__init__((center[0], center[1]),
                                      radius=radius, **kwargs)
         self.noFill()
 
@@ -144,4 +144,3 @@ class Line(_CLine):
     def __init__(self, *args, **kwargs):
         super(Line, self).__init__(*args, **kwargs)
         self.noFill()
-
