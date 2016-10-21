@@ -62,7 +62,7 @@ class Transform:
         return x,y
 
 class Canvas(object):
-    def __init__(self, filename="noname.svg", size=(300, 300), **extras):
+    def __init__(self, size=(300, 300), filename="noname.svg", **extras):
         if "debug" not in extras:
             extras["debug"] = False
         self.filename = filename
@@ -160,6 +160,9 @@ class Canvas(object):
 
     def rotate(self, radians):
         self.matrix[-1].append(("rotate", radians * 180/math.pi))
+
+    def scale(self, x, y):
+        self.matrix[-1].append(("scale", x, y))
 
     def popMatrix(self):
         self.matrix.pop()
