@@ -171,11 +171,18 @@ class Canvas(object):
         self._viewbox = (xmin, ymin, width, height)
 
     def save(self, filename=None, **attribs):
-        drawing = self._render(**attribs)
-        if filename:
-            drawing.saveas(filename)
+        format = "svg"
+        if filename and "." in filename:
+            format = filename.rsplit(".", 1)[1]
+        if format == "svg":
+            drawing = self._render(**attribs)
+            if filename:
+                drawing.saveas(filename)
+            else:
+                drawing.save()
         else:
-            drawing.save()
+            im = self.toPIL(**attribs)
+            im.save(filename, format=format)
 
     def draw(self, shape):
         shape.canvas = self
@@ -213,8 +220,8 @@ class Canvas(object):
         drawing = self._render(**attribs)
         return drawing.tostring()
 
-    def _repr_png_(self):
-        return self.convert(format="png")
+    def _repr_png_(self, **attribs):
+        return self.convert(format="png", **attribs)
 
     def __str__(self):
         return self._repr_svg_()
@@ -227,13 +234,13 @@ class Canvas(object):
         surface = cairosvg.SURFACES[format.upper()]
         return surface.convert(bytestring=str(self), **kwargs)
 
-    def toPIL(self):
+    def toPIL(self, **attribs):
         """
         Convert canvas to a PIL image
         """
         import PIL.Image
 
-        png = self._repr_png_()
+        png = self._repr_png_(**attribs)
         sfile = io.BytesIO(png)
         pil = PIL.Image.open(sfile)
         background = PIL.Image.new('RGBA', pil.size, (255, 255, 255))
@@ -242,11 +249,11 @@ class Canvas(object):
         im = background.convert('RGB').convert('P', palette=PIL.Image.ADAPTIVE)
         return im
 
-    def toGIF(self):
+    def toGIF(self, **attribs):
         """
         Convert canvas to GIF bytes
         """
-        im = self.toPIL()
+        im = self.toPIL(**attribs)
         sfile = io.BytesIO()
         im.save(sfile, format="gif")
         return sfile.getvalue()
