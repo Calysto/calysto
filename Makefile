@@ -1,6 +1,7 @@
 all:
-	pip install wheel
+	pip install wheel -U
 	python setup.py register
-	python setup.py bdist_wheel upload
-	python setup.py sdist --formats=gztar,zip upload
+	python setup.py bdist_wheel
+	python setup.py sdist --formats=zip
+	twine upload dist/*
 
