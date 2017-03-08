@@ -343,7 +343,10 @@ class Color(object):
     def __str__(self):
         def h(num):
             return ("0x%02x" % num)[-2:]
-        return "#" + h(self.red) + h(self.green) + h(self.blue)
+        if self.alpha != 255:
+            return "rgba(%s,%s,%s,%s)" % (self.red, self.green, self.blue, self.alpha/255)
+        else:
+            return "#" + h(self.red) + h(self.green) + h(self.blue)
 
 class Shape(object):
     def __init__(self, center=(0,0), **extras):
