@@ -243,9 +243,9 @@ class Canvas(object):
         png = self._repr_png_(**attribs)
         sfile = io.BytesIO(png)
         pil = PIL.Image.open(sfile)
-        background = PIL.Image.new('RGBA', pil.size, (255, 255, 255))
+        background = PIL.Image.new('RGB', pil.size, (255, 255, 255))
         # Paste the image on top of the background
-        background.paste(pil, pil)
+        background.paste(pil, mask=pil.split()[-1])
         im = background.convert('RGB').convert('P', palette=PIL.Image.ADAPTIVE)
         return im
 
