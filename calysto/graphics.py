@@ -348,6 +348,9 @@ class Color(object):
         else:
             return "#" + h(self.red) + h(self.green) + h(self.blue)
 
+    def __getitem__(self, pos):
+        return [self.red, self.green, self.blue][pos]
+
 class Shape(object):
     def __init__(self, center=(0,0), **extras):
         if isinstance(center, tuple):
