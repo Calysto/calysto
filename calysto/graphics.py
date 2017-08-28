@@ -231,7 +231,11 @@ class Canvas(object):
         png, ps, pdf, gif, jpg, svg
         returns image in format as bytes
         """
-        surface = cairosvg.SURFACES[format.upper()]
+        if format.upper() in cairosvg.SURFACES:
+            surface = cairosvg.SURFACES[format.upper()]
+        else:
+            raise Exception("'%s' image format unavailable: use one of %s" %
+                            (format.upper(), list(cairosvg.SURFACES.keys())))
         return surface.convert(bytestring=str(self), **kwargs)
 
     def toPIL(self, **attribs):
