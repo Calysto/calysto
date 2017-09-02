@@ -9,6 +9,9 @@ Homepage: http://calysto.github.io/
 
 ```shell
 $ pip install calysto
+
+OR
+
 $ pip3 install calysto
 ```
 
@@ -17,3 +20,7 @@ You may also need to install:
 * libcairo2
 * libXrender
 * libfontconfig
+
+On MacOS for graphics, you may also need:
+
+* `brew install cairo`
