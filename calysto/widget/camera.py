@@ -23,6 +23,7 @@ import base64
 import io
 
 from IPython.display import Javascript, display
+import ipywidgets
 from ipywidgets import Widget, register, widget_serialization, DOMWidget
 from traitlets import Bool, Dict, Int, Float, Unicode, List, Instance
 
@@ -68,10 +69,14 @@ class CameraWidget(DOMWidget):
             return (np.array(image).astype("float32") / 255.0)
 
 def get_camera_javascript(width=320, height=240):
+    if ipywidgets._version.version_info < (7,):
+        jupyter_widgets = "jupyter-js-widgets"
+    else:
+        jupyter_widgets = "@jupyter-widgets/base"
     camera_javascript = """
 require.undef('camera');
 
-define('camera', ["@jupyter-widgets/base"], function(widgets) {
+define('camera', ["%(jupyter_widgets)"], function(widgets) {
     var CameraView = widgets.DOMWidgetView.extend({
         defaults: _.extend({}, widgets.DOMWidgetView.prototype.defaults, {
             _view_name: 'CameraView',
@@ -142,5 +147,5 @@ define('camera', ["@jupyter-widgets/base"], function(widgets) {
         CameraView: CameraView
     }
 });
-""" % {"width": width, "height": height}
+""" % {"width": width, "height": height, "jupyter_widgets": jupyter_widgets}
     return camera_javascript
