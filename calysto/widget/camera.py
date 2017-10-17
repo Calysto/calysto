@@ -1,113 +1,146 @@
-try:
-    from ipywidgets.widgets import DOMWidget
-except:
-    from IPython.html.widgets import DOMWidget
+# calysto - general support utilities for Jupyter
+#
+# Copyright (c) Douglas S. Blank <doug.blank@gmail.com>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor,
+# Boston, MA 02110-1301  USA
 
-from IPython.utils.traitlets import Unicode, Bytes, Instance
-from IPython.display import Javascript
-
-try:
-    import jupyter_kernel
-    display = jupyter_kernel.get_jupyter().Display
-except:
-    from IPython.display import display
-
+import numpy as np
+import PIL
 import base64
-from PIL import Image
-from numpy import array, ndarray
-import time
+import io
 
-try:
-    import StringIO
-except ImportError:
-    from io import StringIO
+from IPython.display import Javascript, display
+from ipywidgets import Widget, register, widget_serialization, DOMWidget
+from traitlets import Bool, Dict, Int, Float, Unicode, List, Instance
 
-class Camera(DOMWidget):
-    _view_name = Unicode('CameraView', sync=True)
-    image_uri = Unicode('', sync=True)
-    image_array = Instance(ndarray)
-    ##image = Instance(Image.Image)
+__version__ = "1.0.3"
+
+#------------------------------------------------------------------------
+# utility functions
+
+def uri_to_image(image_str, width=320, height=240):
+    header, image_b64 = image_str.split(",")
+    image_binary = base64.b64decode(image_b64)
+    image = PIL.Image.open(io.BytesIO(image_binary)).resize((width, height))
+    return image
+
+@register("CameraWidget")
+class CameraWidget(DOMWidget):
+    """Represents a media source."""
+    _view_module = Unicode('camera').tag(sync=True)
+    _view_name = Unicode('CameraView').tag(sync=True)
+    _model_module = Unicode('camera').tag(sync=True)
+    _model_name = Unicode('CameraModel').tag(sync=True)
+    _view_module_version = Unicode(__version__).tag(sync=True)
+    # Specify audio constraint and video constraint as a boolean or dict.
+    audio = Bool(False).tag(sync=True)
+    video = Bool(True).tag(sync=True)
+    image = Unicode('').tag(sync=True)
+    image_count = Int(0).tag(sync=True)
 
     def __init__(self, *args, **kwargs):
-        super(Camera, self).__init__(*args, **kwargs)
-        self.data = None
-        display(Javascript(self.get_javascript()))
-        time.sleep(.1)
-
-    def _image_uri_changed(self, name, new):
-        head, self.data = new.split(',', 1)
+        display(Javascript(get_camera_javascript()))
+        super().__init__(*args, **kwargs)
 
     def get_image(self):
-        return Image.open(StringIO.StringIO(base64.b64decode(self.data)))
+        if self.image:
+            return uri_to_image(self.image)
 
-    def get_array(self):
-        im = self.get_image()
-        self.image_array = array(im)
+    def get_data(self):
+        if self.image:
+            image = uri_to_image(self.image)
+            ## trim from 4 to 3 dimensions: (remove alpha)
+            # remove the 3 index of dimension index 2 (the A of RGBA color)
+            image = np.delete(image, np.s_[3], 2)
+            return (np.array(image).astype("float32") / 255.0)
 
-    def get_javascript(self):
-        return """   require(["widgets/js/widget"], function(WidgetManager){
-		    var CameraView = IPython.DOMWidgetView.extend({
-		        render: function(){
-		            // based on https://developer.mozilla.org/en-US/docs/WebRTC/taking_webcam_photos
-		            var video        = $('<video>')[0];
-		            var canvas       = $('<canvas>')[0];
-		            var startbutton  = $('<button id = picture_button>Take Picture</button>')[0];
-		            var width = 320;
-		            var height = 0;
-		            var that = this;
-		
-		            setTimeout(function() {that.$el.append(video).append(startbutton).append(canvas);}, 200);
-		            //$(canvas).hide();
-		            //window.vvv=video;
-		            var streaming = false;
-		            navigator.getMedia = ( navigator.getUserMedia ||
-		                                 navigator.webkitGetUserMedia ||
-		                                 navigator.mozGetUserMedia ||
-		                                 navigator.msGetUserMedia);
-		
-		            navigator.getMedia({video: true, audio: false},
-		                function(stream) {
-		                  if (navigator.mozGetUserMedia) {
-		                    video.mozSrcObject = stream;
-		                  } else {
-		                    var vendorURL = window.URL || window.webkitURL;
-		                    video.src = vendorURL.createObjectURL(stream);
-		                  }
-		                  video.play();
-		                },
-		                function(err) {
-		                  console.log("An error occured! " + err);
-		                }
-		            );
-		
-		            video.addEventListener('canplay', function(ev){
-		                if (!streaming) {
-		                  height = video.videoHeight / (video.videoWidth/width);
-		                  video.setAttribute('width', width);
-		                  video.setAttribute('height', height);
-		                  canvas.setAttribute('width', width);
-		                  canvas.setAttribute('height', height);
-		                  streaming = true;
-		                }
-		            }, false);
-		            function takepicture() {
-		                canvas.width = width;
-		                canvas.height = height;
-		                canvas.getContext('2d').drawImage(video, 0, 0, width, height);
-		                that.model.set('image_uri',canvas.toDataURL('image/png'));
-		                that.touch();
-		            }
-		            startbutton.addEventListener('click', function(ev){
-		                takepicture();
-		                ev.preventDefault();
-		            }, false);
-		        },
-		    });
-		    
-		    // Register the DatePickerView with the widget manager.
-		    IPython.WidgetManager.register_widget_view('CameraView', CameraView);
-		
-		});"""
+def get_camera_javascript(width=320, height=240):
+    camera_javascript = """
+require.undef('camera');
 
-    def click(self):
-        display(Javascript("document.getElementById('picture_button').click();"))
+define('camera', ["@jupyter-widgets/base"], function(widgets) {
+    var CameraView = widgets.DOMWidgetView.extend({
+        defaults: _.extend({}, widgets.DOMWidgetView.prototype.defaults, {
+            _view_name: 'CameraView',
+            _view_module: 'camera',
+            audio: false,
+            video: true,
+        }),
+
+        initialize: function() {
+
+            var div = document.createElement('div');
+            var el = document.createElement('video');
+            el.setAttribute('id', "video_widget");
+            el.setAttribute('width', %(width)s);
+            el.setAttribute('height', %(height)s);
+            div.appendChild(el);
+            var canvas = document.createElement('canvas');
+            canvas.setAttribute('id', "video_canvas");
+            canvas.setAttribute('width', %(width)s);
+            canvas.setAttribute('height', %(height)s);
+            div.appendChild(canvas);
+            div.appendChild(document.createElement('br'));
+            var button = document.createElement('button');
+            button.innerHTML = "Take a Picture";
+            var that = this;
+            button.onclick = function(b) {
+                var video = document.querySelector("#video_widget");
+                var canvas = document.querySelector("#video_canvas");
+                if (video) {
+                    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+                    var url = canvas.toDataURL('image/png');
+                    if (that.model) {
+                        that.model.set('image', url);
+                        that.model.save_changes();
+                    }
+                }
+            };
+            div.appendChild(button);
+            this.setElement(div);
+            CameraView.__super__.initialize.apply(this, arguments);
+        },
+
+        render: function() {
+            var that = this;
+             that.model.stream.then(function(stream) {
+                 that.el.children[0].src = window.URL.createObjectURL(stream);
+                 that.el.children[0].play();
+             });
+        }
+    });
+
+    var CameraModel = widgets.DOMWidgetModel.extend({
+        defaults: _.extend({}, widgets.DOMWidgetModel.prototype.defaults, {
+            _model_name: 'CameraModel',
+            _model_module: 'camera',
+            audio: false,
+            video: true
+        }),
+
+        initialize: function() {
+            CameraModel.__super__.initialize.apply(this, arguments);
+            // Get the camera permissions
+            this.stream = navigator.mediaDevices.getUserMedia({audio: false, video: true});
+        }
+    });
+    return {
+        CameraModel: CameraModel,
+        CameraView: CameraView
+    }
+});
+""" % {"width": width, "height": height}
+    return camera_javascript
