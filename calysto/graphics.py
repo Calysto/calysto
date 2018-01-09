@@ -220,9 +220,6 @@ class Canvas(object):
         drawing = self._render(**attribs)
         return drawing.tostring()
 
-    def _repr_png_(self, **attribs):
-        return self.convert(format="png", **attribs)
-
     def __str__(self):
         return self._repr_svg_()
 
@@ -243,15 +240,10 @@ class Canvas(object):
         Convert canvas to a PIL image
         """
         import PIL.Image
-
-        png = self._repr_png_(**attribs)
-        sfile = io.BytesIO(png)
+        bytes = self.convert("png")
+        sfile = io.BytesIO(bytes)
         pil = PIL.Image.open(sfile)
-        background = PIL.Image.new('RGB', pil.size, (255, 255, 255))
-        # Paste the image on top of the background
-        background.paste(pil, mask=pil.split()[-1])
-        im = background.convert('RGB').convert('P', palette=PIL.Image.ADAPTIVE)
-        return im
+        return pil
 
     def toGIF(self, **attribs):
         """
@@ -262,19 +254,12 @@ class Canvas(object):
         im.save(sfile, format="gif")
         return sfile.getvalue()
 
-    def toArray(self, dpi=96, **kwargs):
+    def toArray(self):
         """
-        Converts svg-based image as a numpy array.
+        Converts canvas to a numpy array.
         """
-        kwargs['bytestring'] = str(self)
-        tree = Tree(**kwargs)
-        pngsurface = cairosvg.SURFACES["PNG"](tree, None, dpi)
-        buffer = pngsurface.cairo.get_data()
-        width = pngsurface.cairo.get_width()
-        height = pngsurface.cairo.get_height()
-        array = numpy.frombuffer(buffer, numpy.uint8)
-        array.shape = (width, height, 4) # 4 = rgb + alpha
-        return array
+        im = self.toPIL(**attribs)
+        return im.toarray()
 
     def start_movie(self):
         self.frames = []
