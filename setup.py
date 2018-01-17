@@ -10,7 +10,7 @@ if svem_flag in sys.argv:
     sys.argv.remove(svem_flag)
 
 setup(name='calysto',
-      version='1.0.4',
+      version='1.0.5',
       description='Libraries and Languages for Python and IPython',
       long_description="Libraries and Languages for IPython and Python",
       author='Douglas Blank',
@@ -23,6 +23,7 @@ setup(name='calysto',
                 'calysto.widget',
                 'calysto.chart',
                 'calysto.simulations',
+                'calysto.magics',
                 'calysto.ai'],
       data_files = [("calysto/images", ["calysto/images/logo-64x64.png",
                                         "calysto/images/logo-32x32.png"])],

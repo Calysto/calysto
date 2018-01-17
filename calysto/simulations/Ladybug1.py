@@ -1,9 +1,12 @@
 from calysto.simulation import *
+import numpy
 import random
 import math
 
 class LadybugSimulation(DiscreteSimulation):
     def initialize(self):
+        random.seed(42)
+        numpy.random.seed(42)
         super(LadybugSimulation, self).initialize()
         self.reset()
         for robot in self.robots:
