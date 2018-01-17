@@ -1222,7 +1222,7 @@ def View(sim_filename):
                                 error])
 
 
-    stop_button.on_click(stop_and_start)
+    #stop_button.on_click(stop_and_start)
     stop_sim_button.on_click(stop_sim)
     restart_button.on_click(lambda obj: restart(550, 350, -math.pi/2))
     pause_button.on_click(toggle_pause)
